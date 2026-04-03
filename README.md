@@ -1,4 +1,4 @@
-# Nouz — MCP Server for Obsidian
+# Nouz — MCP Server for local knowledge management
 
 **v2.1.0**
 
