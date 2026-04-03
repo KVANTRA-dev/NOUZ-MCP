@@ -51,4 +51,4 @@ tags: [systems]
 
 ---
 
-> _Cosine calculates, syntax changes, semantics remains._
+> _Косинусы считаются, синтаксис меняется, семантика остаётся._
