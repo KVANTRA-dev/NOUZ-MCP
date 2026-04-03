@@ -12,13 +12,10 @@ mode: prizma
 prizma_modes:
   SystemThinking:
     keywords: ["feedback", "loop", "emergence", "holism", "mental model", "leverage point"]
-    signs: ["Ψ"]
   Structure:
     keywords: ["taxonomy", "hierarchy", "DAG", "logic", "classification"]
-    signs: ["Δ"]
   Computing:
     keywords: ["code", "algorithm", "software", "neural network", "LLM", "agent"]
-    signs: ["Σ"]
 
 # Core etalons for semantic classification
 etalons:
