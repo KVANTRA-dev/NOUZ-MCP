@@ -1,5 +1,5 @@
 # =============================================================================
-# Nouz MCP Server Configuration
+# Nouz MCP Server Configuration (optional)
 # =============================================================================
 
 # Mode: luca | prizma | sloi
@@ -8,26 +8,19 @@
 # - sloi: Strict 5-level hierarchy with semantic classification
 mode: prizma
 
-# PRIZMA mode: auto-select thinking style based on keywords
-prizma_modes:
-  SystemThinking:
-    keywords: ["feedback", "loop", "emergence", "holism", "mental model", "leverage point"]
-  Structure:
-    keywords: ["taxonomy", "hierarchy", "DAG", "logic", "classification"]
-  Computing:
-    keywords: ["code", "algorithm", "software", "neural network", "LLM", "agent"]
-
-# Core etalons for semantic classification
+# Semantic etalons (optional) — for better semantic classification
+# You can start with just level/type in YAML, etalons are optional
+# Recommended: use 3 distinct domains with cosine < 0.55 between them
 etalons:
-  - sign: "Ψ"
-    name: SystemThinking
-    text: "feedback loop emergence holism mental model"
-  - sign: "Δ"
-    name: Structure
-    text: "taxonomy hierarchy logic classification DAG"
-  - sign: "Σ"
-    name: Computing
-    text: "code algorithm software neural network LLM"
+  - sign: M
+    name: Logic
+    text: "syllogism дедукция axiomatic аксиома proof теорема logical argument философское reasoning рассуждение fallacy заблуждение"
+  - sign: C
+    name: Astrophysics
+    text: "supernova сверхновая exoplanet экзопланета dark matter тёмная материя quasar квазар black hole чёрная дыра stellar звёздный"
+  - sign: P
+    name: Biology
+    text: "DNA ДНК genome геном CRISPR gene editing белок protein фермент metabolism метаболизм cell клетка neuron нейрон"
 
 levels:
   core: 1
@@ -37,11 +30,7 @@ levels:
   artifact: 5
 
 thresholds:
-  sign_spread: 0.05          # не требует настройки
-  confident_cosine: 0.75     # не требует настройки
-  pattern_second_sign_threshold: 30.0  # не требует настройки
-  # semantic_bridge_threshold: порог для семантических мостов между разными знаками
-  # Начни с 0.55, потом регулируй под свой стиль мышления:
-  # - > 0.6: чёткое разделение (меньше мостов, строже классификация)
-  # - < 0.5: больше перекрытий (эмерджентность, неожиданные связи)
+  sign_spread: 0.05
+  confident_cosine: 0.75
+  pattern_second_sign_threshold: 30.0
   semantic_bridge_threshold: 0.55
