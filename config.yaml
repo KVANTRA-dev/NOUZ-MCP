@@ -1,26 +1,32 @@
 # =============================================================================
-# Nouz MCP Server Configuration (optional)
+# NOUZ MCP Server Configuration Template
 # =============================================================================
+# Rename this file to config.yaml to activate custom settings.
+# By default, without config.yaml, the server runs in "luca" mode (pure graph).
 
 # Mode: luca | prizma | sloi
-# - luca: Graph-based, no semantic classification
+# - luca: Graph-based, no semantic classification (Default fallback)
 # - prizma: Graph-based with semantic classification and core_mix
 # - sloi: Strict 5-level hierarchy with semantic classification
 mode: prizma
 
 # Semantic etalons (optional) — for better semantic classification
 # You can start with just level/type in YAML, etalons are optional
-# Recommended: use 3 distinct domains with cosine < 0.55 between them
+# Recommended: use distinct domains with low cosine similarity between them.
+# This is an example of an interdisciplinary knowledge base structure:
 etalons:
-  - sign: M
-    name: Logic
-    text: "syllogism дедукция axiomatic аксиома proof теорема logical argument философское reasoning рассуждение fallacy заблуждение"
-  - sign: C
-    name: Astrophysics
-    text: "supernova сверхновая exoplanet экзопланета dark matter тёмная материя quasar квазар black hole чёрная дыра stellar звёздный"
-  - sign: P
-    name: Biology
-    text: "DNA ДНК genome геном CRISPR gene editing белок protein фермент metabolism метаболизм cell клетка neuron нейрон"
+  - sign: T
+    name: Technology & Engineering
+    text: "programming software architecture infrastructure machine learning neural networks algorithms frameworks database cloud computing code execution server development automation"
+  - sign: S
+    name: Science & Mathematics
+    text: "physics chemistry biology mathematics formal logic theorems cosmology quantum mechanics natural sciences research methodology physics equation variable formula calculation"
+  - sign: H
+    name: Humanities & Arts
+    text: "philosophy psychology sociology history literature art culture ethics human behavior cognitive science epistemology semantics language linguistics"
+  - sign: B
+    name: Business & Economics
+    text: "management strategy finance markets entrepreneurship economics operations leadership marketing product development sales resources investment"
 
 levels:
   core: 1
