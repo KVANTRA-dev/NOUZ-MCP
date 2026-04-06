@@ -8,36 +8,6 @@ NOUZ is an MCP server that brings semantic structure to your Obsidian vault. It 
 
 ## Architecture & Modes
 
-<div align="center">
-  <svg width="600" height="200" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
-    <rect width="600" height="200" fill="#1e1e1e" rx="10"/>
-    <rect x="50" y="25" width="140" height="150" fill="#333" rx="8" stroke="#4CAF50" stroke-width="2"/>
-    <text x="120" y="60" fill="white" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">LUCA</text>
-    <text x="120" y="90" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">Pure Graph</text>
-    <text x="120" y="110" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">Explicit Links Only</text>
-    
-    <rect x="230" y="25" width="140" height="150" fill="#333" rx="8" stroke="#2196F3" stroke-width="2"/>
-    <text x="300" y="60" fill="white" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">PRIZMA</text>
-    <text x="300" y="90" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">Graph + Semantics</text>
-    <text x="300" y="110" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">Core Mix & Auto-signs</text>
-    
-    <rect x="410" y="25" width="140" height="150" fill="#333" rx="8" stroke="#FF9800" stroke-width="2"/>
-    <text x="480" y="60" fill="white" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">SLOI</text>
-    <text x="480" y="90" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">Strict Hierarchy</text>
-    <text x="480" y="110" fill="#aaa" font-family="sans-serif" font-size="12" text-anchor="middle">DAG Enforced</text>
-    
-    <!-- Arrows -->
-    <path d="M 190 100 L 220 100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
-    <path d="M 370 100 L 400 100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
-    
-    <defs>
-      <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-        <path d="M0,0 L0,6 L9,3 z" fill="#666" />
-      </marker>
-    </defs>
-  </svg>
-</div>
-
 ### LUCA — Pure Graph (Default)
 Simple graph mode. Level and type are for display only, no semantic classification. Good for general note-taking.
 
