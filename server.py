@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz — Unified MCP Server for Obsidian. v2.1.0
+Nouz — Unified MCP Server for Obsidian. v2.0.0
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.1.0"
+VERSION = "2.0.0"
 
 import asyncio
 import hashlib
@@ -39,24 +39,8 @@ from mcp import types
 DEFAULT_CONFIG = {
     "profiles": {
         "default": {
-            "mode": "prizma",
-            "etalons": [
-                {
-                    "sign": "M",
-                    "name": "Logic",
-                    "text": "syllogism дедукция axiomatic аксиома proof теорема logical argument философское reasoning рассуждение fallacy заблуждение"
-                },
-                {
-                    "sign": "C",
-                    "name": "Astrophysics",
-                    "text": "supernova сверхновая exoplanet экзопланета dark matter тёмная материя quasar квазар black hole чёрная дыра stellar звёздный"
-                },
-                {
-                    "sign": "P",
-                    "name": "Biology",
-                    "text": "DNA ДНК genome геном CRISPR gene editing белок protein фермент metabolism метаболизм cell клетка neuron нейрон"
-                }
-            ]
+            "mode": "luca",
+            "etalons": []
         }
     },
     "levels": {
@@ -120,7 +104,7 @@ def load_config() -> Dict[str, Any]:
             profiles = config.get("profiles", {})
             if profiles and profile_name in profiles:
                 profile = profiles[profile_name]
-                config["mode"] = profile.get("mode", config.get("mode", "prizma"))
+                config["mode"] = profile.get("mode", config.get("mode", "luca"))
                 config["etalons"] = profile.get("etalons", config.get("etalons", DEFAULT_CONFIG["profiles"]["default"]["etalons"]))
                 logging.info(f"Using profile: {profile_name}")
             elif "etalons" not in config and "profiles" not in config:
@@ -140,8 +124,8 @@ def load_config() -> Dict[str, Any]:
 
 CONFIG = load_config()
 PROFILE = os.getenv("PROFILE", "default")
-MODE = CONFIG.get("mode", "prizma")
-RULE = RULES.get(MODE, RULES["prizma"])
+MODE = CONFIG.get("mode", "luca")
+RULE = RULES.get(MODE, RULES["luca"])
 
 CORE_ETALON_TEXTS = {e["sign"]: e["text"] for e in CONFIG.get("etalons", DEFAULT_CONFIG["profiles"]["default"]["etalons"])}
 CORE_SIGNS = set(CORE_ETALON_TEXTS.keys())
