@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+nouz_mcp.egg-info/PKG-INFO
+nouz_mcp.egg-info/SOURCES.txt
+nouz_mcp.egg-info/dependency_links.txt
+nouz_mcp.egg-info/entry_points.txt
+nouz_mcp.egg-info/requires.txt
+nouz_mcp.egg-info/top_level.txt

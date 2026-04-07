@@ -1,0 +1,64 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.KVANTRA-dev/nouz",
+  "title": "Nouz",
+  "description": "Unified MCP Server for Obsidian - graph-based note management with semantic classification",
+  "repository": {
+    "url": "https://github.com/KVANTRA-dev/nouz-mcp",
+    "source": "github"
+  },
+  "version": "2.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "nouz-mcp",
+      "version": "2.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "OBSIDIAN_ROOT",
+          "description": "Path to Obsidian vault",
+          "format": "string",
+          "isRequired": false,
+          "default": "./obsidian"
+        },
+        {
+          "name": "MODE",
+          "description": "Server mode: luca, prizma, or sloi",
+          "format": "string",
+          "isRequired": false,
+          "default": "prizma"
+        },
+        {
+          "name": "EMBED_ENABLED",
+          "description": "Enable embedding-based features",
+          "format": "string",
+          "isRequired": false,
+          "default": "true"
+        },
+        {
+          "name": "EMBED_PROVIDER",
+          "description": "Embedding provider: openai, gigachat, lmstudio",
+          "format": "string",
+          "isRequired": false,
+          "default": "openai"
+        },
+        {
+          "name": "EMBED_MODEL",
+          "description": "Embedding model name",
+          "format": "string",
+          "isRequired": false
+        },
+        {
+          "name": "EMBED_API_URL",
+          "description": "Embedding API endpoint",
+          "format": "string",
+          "isRequired": false,
+          "default": "http://127.0.0.1:1234/v1"
+        }
+      ]
+    }
+  ]
+}

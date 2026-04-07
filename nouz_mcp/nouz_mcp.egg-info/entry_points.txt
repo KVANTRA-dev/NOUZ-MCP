@@ -1,0 +1,2 @@
+[console_scripts]
+nouz-mcp = nouz_mcp.server:main

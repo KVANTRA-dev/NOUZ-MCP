@@ -1,0 +1,94 @@
+Metadata-Version: 2.4
+Name: nouz-mcp
+Version: 2.1.1
+Summary: Unified MCP Server for Obsidian - graph-based note management with semantic classification
+Author-email: KVANTRA-dev <your-email@example.com>
+License: MIT
+Keywords: mcp,obsidian,knowledge-graph,semantic-classification
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: mcp>=1.0.0
+Requires-Dist: aiofiles>=23.0.0
+Requires-Dist: frontmatter>=3.0.0
+Requires-Dist: aiohttp>=3.9.0
+Requires-Dist: aiosqlite>=0.19.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+
+# Nouz MCP Server
+
+Unified MCP Server for Obsidian — graph-based note management with semantic classification.
+
+## Features
+
+- **Three modes**: `luca`, `prizma`, `sloi`
+- Graph-based note organization with parent-child relationships
+- Semantic classification using embedding similarity
+- Auto mode selection based on query content
+- Full-text search and path suggestions
+
+## Installation
+
+```bash
+pip install nouz-mcp
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OBSIDIAN_ROOT` | `./obsidian` | Path to Obsidian vault |
+| `MODE` | `prizma` | Server mode: `luca`, `prizma`, or `sloi` |
+| `EMBED_ENABLED` | `true` | Enable embedding-based features |
+| `EMBED_PROVIDER` | `openai` | Embedding provider: `openai`, `gigachat`, `lmstudio` |
+| `EMBED_MODEL` | - | Embedding model name |
+| `EMBED_API_URL` | `http://127.0.0.1:1234/v1` | Embedding API endpoint |
+| `LLM_API_URL` | `http://127.0.0.1:1234/v1` | LLM API endpoint |
+
+### Running
+
+```bash
+# Basic usage
+nouz-mcp
+
+# With custom vault path
+OBSIDIAN_ROOT=/path/to/vault nouz-mcp
+
+# With specific mode
+MODE=sloi nouz-mcp
+```
+
+## MCP Tools
+
+- `list_notes` — List notes in vault
+- `read_note` — Read note content with metadata
+- `write_note` — Create/update note
+- `search_notes` — Full-text search
+- `get_parents` — Get parent notes
+- `suggest_parents` — Suggest similar parent notes (prizma/sloi)
+- `suggest_metadata` — Auto-suggest metadata
+- `index_all` — Reindex all notes
+- `embed` — Get text embedding
+
+## Development
+
+```bash
+# Install in development mode
+pip install -e .
+
+# Run tests
+pytest
+```
+
+---
+
+<!-- mcp-name: io.github.KVANTRA-dev/nouz -->
