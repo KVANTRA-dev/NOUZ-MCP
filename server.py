@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz — Unified MCP Server for Obsidian. v2.1.0
+Nouz — Unified MCP Server for Obsidian. v2.1.1
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 
 import asyncio
 import hashlib
@@ -159,6 +159,7 @@ EMBED_ENABLED = os.getenv("EMBED_ENABLED", "true").lower() == "true"
 EMBED_MODEL = os.getenv("EMBED_MODEL", "")
 EMBED_API_URL = os.getenv("EMBED_API_URL", "http://127.0.0.1:1234/v1")
 EMBED_API_KEY = os.getenv("EMBED_API_KEY", "")
+EMBED_MAX_CHARS = 2000
 
 
 # ============================================================================
@@ -821,9 +822,13 @@ def _get_sign_from_file(p: Path) -> str:
     return ""
 
 async def _resolve_entity_path(db_path: str, entity_name: str) -> Optional[str]:
+    # Try both separators for cross-platform compatibility
+    suffix_fwd = f'/{entity_name}.md'
+    suffix_bck = f'\\{entity_name}.md'
     async with aiosqlite.connect(db_path) as db:
         async with db.execute(
-            'SELECT path FROM files WHERE path LIKE ?', (f'%{os.sep}{entity_name}.md',)
+            'SELECT path FROM files WHERE path LIKE ? OR path LIKE ?',
+            (f'%{suffix_fwd}', f'%{suffix_bck}')
         ) as cur:
             row = await cur.fetchone()
     if row:
@@ -852,7 +857,7 @@ async def _determine_core_by_embedding(content: str, db_path: str) -> Dict[str, 
     if not RULE["reference_vectors"]:
         return {"dominant": None, "above_threshold": [], "scores": {}, "percentages": {}, "spread": 0.0, "confident": False}
     
-    vec = await _get_embedding(content[:2000])
+    vec = await _get_embedding(content[:EMBED_MAX_CHARS])
     if not vec:
         return {"dominant": None, "above_threshold": [], "scores": {}, "percentages": {}, "spread": 0.0, "confident": False}
 
@@ -913,7 +918,7 @@ async def suggest_parents(file_path: str, db_path: str, top_n: int = 3) -> Dict[
     
     core_result = await _determine_core_by_embedding(content, db_path)
     dominant_core = core_result.get("dominant")
-    own_vec = await _get_embedding(content[:2000])
+    own_vec = await _get_embedding(content[:EMBED_MAX_CHARS])
     
     if not own_vec:
         return {
@@ -1256,22 +1261,23 @@ async def _recalc_signs(db_path: str, dry_run: bool = False) -> Dict[str, Any]:
         async with db.execute('SELECT path, content FROM files') as cur:
             rows = await cur.fetchall()
     
+    updates = []
     for path, content in rows:
         if not content:
             continue
         sign_result = await _determine_sign_smart(content, {"sign": ""}, db_path)
         actual_sign = sign_result["actual_sign"]
-        sign_auto = sign_result["sign_auto"]
         source = sign_result["source"]
-        
-        if not dry_run:
-            async with aiosqlite.connect(db_path) as db:
-                await db.execute(
-                    'UPDATE files SET sign_auto = ?, sign_source = ? WHERE path = ?',
-                    (actual_sign, source, path)
-                )
-                await db.commit()
+        updates.append((actual_sign, source, path))
         updated += 1
+    
+    if not dry_run and updates:
+        async with aiosqlite.connect(db_path) as db:
+            await db.executemany(
+                'UPDATE files SET sign_auto = ?, sign_source = ? WHERE path = ?',
+                updates
+            )
+            await db.commit()
     
     return {"updated": updated, "dry_run": dry_run}
 
@@ -1283,7 +1289,7 @@ async def _recalc_core_mix(db_path: str) -> Dict[str, Any]:
         async with db.execute('SELECT path, level FROM files ORDER BY level DESC') as cur:
             rows = await cur.fetchall()
     
-    updated = 0
+    updates = []
     for path, level in rows:
         if RULE["level_strict"]:
             child_level = (level or 0) - 1 if level else None
@@ -1291,15 +1297,17 @@ async def _recalc_core_mix(db_path: str) -> Dict[str, Any]:
             child_level = None
         core_mix = await _aggregate_core_mix(db_path, path, child_level)
         if core_mix:
-            async with aiosqlite.connect(db_path) as db:
-                await db.execute(
-                    'UPDATE files SET core_mix = ? WHERE path = ?',
-                    (json.dumps(core_mix), path)
-                )
-                await db.commit()
-            updated += 1
+            updates.append((json.dumps(core_mix), path))
     
-    return {"updated": updated}
+    if updates:
+        async with aiosqlite.connect(db_path) as db:
+            await db.executemany(
+                'UPDATE files SET core_mix = ? WHERE path = ?',
+                updates
+            )
+            await db.commit()
+    
+    return {"updated": len(updates)}
 
 
 # ============================================================================
@@ -1321,7 +1329,7 @@ async def _index_all_files(db_path: str, with_embeddings: bool = False) -> Dict[
             total += 1
             if with_embeddings and data.get('content') and RULE["reference_vectors"]:
                 if not await _embedding_is_fresh(db_path, str(p)):
-                    vec = await _get_embedding(data['content'][:1000])
+                    vec = await _get_embedding(data['content'][:EMBED_MAX_CHARS])
                     if vec:
                         await _save_embedding(db_path, str(p), vec)
                         embedded += 1
@@ -1359,7 +1367,7 @@ async def run_server():
         
         logger.info("Tip: run 'recalc_signs' and 'recalc_core_mix' tools to compute auto-signatures and core_mix.")
     else:
-        logger.info("Tip: embedings and semantic tools are not available in 'luca' mode.")
+        logger.info("Tip: embeddings and semantic tools are not available in 'luca' mode.")
 
     server = Server("nouz")
     logger.info(f"Nouz MCP Server v{VERSION} started. OBSIDIAN_ROOT={OBSIDIAN_ROOT}")
@@ -1372,84 +1380,112 @@ async def run_server():
         tools = [
             types.Tool(
                 name="read_file",
-                description="Read Obsidian file with metadata (YAML frontmatter + content)",
+                description="Read an Obsidian markdown file and return its YAML frontmatter fields (type, level, sign, parents, tags) "
+                            "plus content body as JSON. Also re-indexes the file in the local DB. "
+                            "Read-only for the file itself. Use this to inspect any note before making changes.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"path": {"type": "string"}},
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT, e.g. 'notes/my-note.md'"}
+                    },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="write_file",
-                description="Write file with YAML frontmatter",
+                description="Write or overwrite an Obsidian markdown file with YAML frontmatter and content body. "
+                            "Destructive: replaces file contents entirely. Syncs parents/parents_meta fields automatically "
+                            "and checks for DAG cycles before writing. Re-indexes the file in DB after write.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string"},
-                        "content": {"type": "string"},
-                        "metadata": {"type": "object"}
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
+                        "content": {"type": "string", "description": "Markdown body (without frontmatter delimiters)"},
+                        "metadata": {"type": "object", "description": "YAML frontmatter fields: type, level, sign, parents, tags, etc."}
                     },
                     "required": ["path", "content"]
                 }
             ),
             types.Tool(
                 name="list_files",
-                description="List files in base with filters",
+                description="List indexed Obsidian files with optional filters. Returns an array of {path, type, level, sign} objects. "
+                            "Use level/sign/subfolder to narrow results. Read-only. "
+                            "Use this instead of get_children when you need a broad overview rather than hierarchy traversal.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "no_metadata": {"type": "boolean"},
-                        "level": {"type": "integer"},
-                        "sign": {"type": "string"},
-                        "subfolder": {"type": "string"}
+                        "no_metadata": {"type": "boolean", "description": "If true, include files without YAML frontmatter"},
+                        "level": {"type": "integer", "description": "Filter by hierarchy level (1=core, 2=pattern, 3=module, 4=quant, 5=artifact)"},
+                        "sign": {"type": "string", "description": "Filter by sign character (e.g. 'T' or 'S')"},
+                        "subfolder": {"type": "string", "description": "Restrict search to a subfolder within the vault"}
                     }
                 }
             ),
             types.Tool(
                 name="get_children",
-                description="Get child files",
+                description="Get all direct and transitive hierarchy children of a node in the DAG. "
+                            "Returns a flat list of relative paths. Read-only. "
+                            "Use this to explore what a node contains; use get_parents to see where a node belongs.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"path": {"type": "string"}},
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                    },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="get_parents",
-                description="Get parent links from file",
+                description="Get parent links for a file from the DAG index. Returns an array of {entity, link_type} objects. "
+                            "Read-only. Use this to understand a node's position in the hierarchy; "
+                            "use get_children for the inverse direction.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"path": {"type": "string"}},
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                    },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="suggest_metadata",
-                description="Suggest metadata for file based on content",
+                description="Analyze a file's content and suggest metadata: type, sign, tags, semantic bridges, and hierarchy errors. "
+                            "Read-only — does not modify the file. Requires embeddings for semantic features (prizma/sloi modes). "
+                            "Use this before write_file to validate or improve a note's classification. "
+                            "Pass context to override specific frontmatter fields for what-if analysis.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string"},
-                        "context": {"type": "object"}
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
+                        "context": {"type": "object", "description": "Optional frontmatter overrides for what-if analysis (e.g. {sign: 'T'})"}
                     },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="embed",
-                description="Get embedding for text",
+                description="Generate a vector embedding for the given text using the configured embedding provider (LM Studio, Ollama, or OpenAI-compatible). "
+                            "Returns {embedding: [...], dim: N}. Read-only, no side effects. "
+                            "Use this for ad-hoc similarity checks; for batch operations use index_all with with_embeddings=true.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"text": {"type": "string"}},
+                    "properties": {
+                        "text": {"type": "string", "description": "Text to embed (will be truncated to ~2000 chars)"}
+                    },
                     "required": ["text"]
                 }
             ),
             types.Tool(
                 name="index_all",
-                description="Index all files in database",
+                description="Scan all markdown files in the vault and index them into the SQLite database. "
+                            "Reports orphaned parent links. Set with_embeddings=true to also compute/update vector embeddings "
+                            "(requires embedding provider; skips files whose embeddings are already fresh). "
+                            "Run this after adding or reorganizing notes. Safe to re-run — idempotent.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"with_embeddings": {"type": "boolean"}}
+                    "properties": {
+                        "with_embeddings": {"type": "boolean", "description": "If true, compute embeddings for all files (slower, requires LM Studio/Ollama). Default false."}
+                    }
                 }
             ),
         ]
@@ -1458,12 +1494,15 @@ async def run_server():
             tools.extend([
                 types.Tool(
                     name="suggest_parents",
-                    description="Suggest parents based on embeddings",
+                    description="Find semantically similar notes by vector cosine similarity and suggest them as potential parent links. "
+                                "Returns top_n candidates ranked by similarity score, with same-core matches prioritized. "
+                                "Read-only — does not modify any files. Requires embeddings (prizma/sloi modes). "
+                                "Use this to discover hierarchy links for orphan notes; use suggest_metadata for broader classification.",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string"},
-                            "top_n": {"type": "integer"}
+                            "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
+                            "top_n": {"type": "integer", "description": "Number of candidates to return (default 3)"}
                         },
                         "required": ["path"]
                     }
@@ -1474,39 +1513,50 @@ async def run_server():
             tools.extend([
                 types.Tool(
                     name="calibrate_cores",
-                    description="Recalculate core etalon embeddings",
+                    description="Recompute reference vector embeddings for all semantic cores defined in config.yaml etalons. "
+                                "Writes new vectors to the reference_vectors DB table and reports pairwise cosine similarities. "
+                                "Run this once after initial setup, or after changing etalon texts in config.yaml. "
+                                "Not available in luca mode.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_core_mix",
                     description="Recalculate core_mix bottom-up: quants (L4) -> modules (L3) -> patterns (L2). "
-                                "Run after index_all with embeddings or after recalc_signs.",
+                                "Each parent node gets a weighted average of its children's sign distributions. "
+                                "Writes updated core_mix to the DB (does not modify YAML files). "
+                                "Run after index_all with embeddings or after recalc_signs. Not available in luca mode.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_signs",
-                    description="Recalculate sign_auto for all files based on content embeddings. Does not modify YAML.",
+                    description="Reclassify all indexed files by computing their sign_auto from content embeddings vs core etalon vectors. "
+                                "Updates sign_auto and sign_source columns in the DB only — does not modify YAML files. "
+                                "Use dry_run=true to preview changes without writing. "
+                                "Run after calibrate_cores or after adding new notes. Not available in luca mode.",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "dry_run": {"type": "boolean", "description": "Show changes only, do not write (default false)"}
+                            "dry_run": {"type": "boolean", "description": "If true, show what would change without writing to DB (default false)"}
                         }
                     }
                 ),
             ])
         
-        if RULE["core_mix"]:
-            tools.append(
-                types.Tool(
-                    name="format_entity_compact",
-                    description="Format compact entity structure formula",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {"path": {"type": "string"}},
-                        "required": ["path"]
-                    }
-                )
+        tools.append(
+            types.Tool(
+                name="format_entity_compact",
+                description="Generate a compact structural formula for a note showing its position in the DAG: "
+                            "(children_signs)[own_sign]{parent_signs}. Read-only. "
+                            "Available in all modes. Use this to quickly visualize a node's graph neighborhood.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                    },
+                    "required": ["path"]
+                }
             )
+        )
         
         return tools
 
@@ -1619,8 +1669,11 @@ async def run_server():
                 
                 data = await read_file_with_metadata(full)
                 content = data.get("content", "")
+                # Merge file metadata with user-provided context (context overrides)
+                file_meta = {k: v for k, v in data.items() if k != "content"}
                 context = args.get("context", {})
-                result = await _suggest_metadata_impl(content, context, db_path, str(full))
+                merged_context = {**file_meta, **context} if context else file_meta
+                result = await _suggest_metadata_impl(content, merged_context, db_path, str(full))
                 return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
             elif name == "embed":
@@ -1666,8 +1719,6 @@ async def run_server():
                 return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
             elif name == "format_entity_compact":
-                if not RULE["core_mix"]:
-                    return [types.TextContent(type="text", text=json.dumps({"error": f"This tool is not available in '{MODE}' mode."}, ensure_ascii=False))]
                 rel = args.get("path", "")
                 full = _safe_path(OBSIDIAN_ROOT, rel)
                 if full is None:
