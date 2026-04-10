@@ -354,7 +354,7 @@ NOUZ runs locally. But when you connect a cloud AI agent (Claude, ChatGPT, etc.)
 | **Order lovers** | Want structure without spending time on manual organization |
 | **Researchers** | Gather lots of information and want to see connections |
 | **AI enthusiasts** | Building knowledge graphs for RAG or agent systems |
-| **Everyone with >100 notes** | When folders stop coping |
+| **Everyone with >100 notes** | 
 
 ---
 
