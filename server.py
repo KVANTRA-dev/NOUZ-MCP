@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz — Unified MCP Server for Obsidian
+Nouz — Unified MCP Server for Obsidian. v2.1.4
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.1.3"
+VERSION = "2.1.4"
 
 import asyncio
 import hashlib
@@ -728,7 +728,7 @@ async def _find_semantic_bridges(
         return []
 
     # If own sign is weak_auto, we don't treat it as a firm domain boundary.
-    # Bridges to notes sharing this sign's core are still proposed — because
+    # Bridges to notes sharing this sign's core are still proposed вЂ” because
     # the domain identity of this note is uncertain and cross-domain links may
     # help the user decide whether to confirm the sign or leave it open.
     sign_for_blocking = own_sign if own_sign_source != "weak_auto" else ""
@@ -746,7 +746,7 @@ async def _find_semantic_bridges(
         if path == own_path:
             continue
         # Block bridge only if BOTH signs are confident (manual or auto).
-        # If either side is weak_auto — bridge is still proposed.
+        # If either side is weak_auto вЂ” bridge is still proposed.
         other_sign_for_blocking = (other_sign or "") if other_sign_source != "weak_auto" else ""
         if _signs_share_core(sign_for_blocking, other_sign_for_blocking):
             continue
@@ -760,7 +760,7 @@ async def _find_semantic_bridges(
                 "entity": Path(path).stem,
                 "link_type": "semantic",
                 "strength": round(sim, 3),
-                "reason": f"cosine={sim:.2f}, signs={own_sign}↔{other_sign}",
+                "reason": f"cosine={sim:.2f}, signs={own_sign}в†”{other_sign}",
             })
 
     bridges.sort(key=lambda x: -x["strength"])
@@ -906,7 +906,7 @@ async def _determine_core_by_embedding(content: str, db_path: str) -> Dict[str, 
     # confident = has dominant AND max_cosine is above absolute threshold.
     # If spread is high (clear winner) but max_cosine is low, the note is
     # relatively closer to one core, but not semantically close to any of them
-    # in absolute terms — classification is weak.
+    # in absolute terms вЂ” classification is weak.
     confident = bool(dominant) and (max_val >= CONFIDENT_COSINE_THRESHOLD)
 
     return {
@@ -1034,8 +1034,8 @@ async def _determine_sign_smart(
             "confident": True,  # manual sign is always treated as confident
         }
     
-    # "auto" = spread clear + max_cosine above threshold → sign is reliable
-    # "weak_auto" = spread shows a winner but max_cosine is low → sign is a
+    # "auto" = spread clear + max_cosine above threshold в†’ sign is reliable
+    # "weak_auto" = spread shows a winner but max_cosine is low в†’ sign is a
     #   relative best-guess. Semantic bridges to this sign's core are NOT blocked,
     #   because the domain identity is uncertain. User should either confirm the
     #   sign manually or let bridges propose cross-domain links.
@@ -1068,7 +1068,7 @@ def _check_hierarchy_strict(entity_type: str, parents: List[Dict]) -> List[Dict]
             errors.append({
                 "type": "level_error",
                 "entity": p.get("entity", ""),
-                "message": f"Parent level {p_level} >= Child level {entity_level} — reversed hierarchy"
+                "message": f"Parent level {p_level} >= Child level {entity_level} вЂ” reversed hierarchy"
             })
         elif entity_level - p_level > 1:
             errors.append({
@@ -1187,7 +1187,7 @@ async def _suggest_metadata_impl(
                         entity_name = meta.get("type", "entity")
                         warnings.append({
                             "type": "core_drift",
-                            "message": f"{entity_name} sign={actual_sign!r} (Intent), но содержимое преимущественно {leading_core} ({pct}%) — расхождение замысла и реальности."
+                            "message": f"{entity_name} sign={actual_sign!r} (Intent), РЅРѕ СЃРѕРґРµСЂР¶РёРјРѕРµ РїСЂРµРёРјСѓС‰РµСЃС‚РІРµРЅРЅРѕ {leading_core} ({pct}%) вЂ” СЂР°СЃС…РѕР¶РґРµРЅРёРµ Р·Р°РјС‹СЃР»Р° Рё СЂРµР°Р»СЊРЅРѕСЃС‚Рё."
                         })
         except Exception:
             pass
@@ -1482,7 +1482,7 @@ async def run_server():
             types.Tool(
                 name="suggest_metadata",
                 description="Analyze a file's content and suggest metadata: type, sign, tags, semantic bridges, and hierarchy errors. "
-                            "Read-only — does not modify the file. Requires embeddings for semantic features (prizma/sloi modes). "
+                            "Read-only вЂ” does not modify the file. Requires embeddings for semantic features (prizma/sloi modes). "
                             "Use this before write_file to validate or improve a note's classification. "
                             "Pass context to override specific frontmatter fields for what-if analysis.",
                 inputSchema={
@@ -1512,7 +1512,7 @@ async def run_server():
                 description="Scan all markdown files in the vault and index them into the SQLite database. "
                             "Reports orphaned parent links. Set with_embeddings=true to also compute/update vector embeddings "
                             "(requires embedding provider; skips files whose embeddings are already fresh). "
-                            "Run this after adding or reorganizing notes. Safe to re-run — idempotent.",
+                            "Run this after adding or reorganizing notes. Safe to re-run вЂ” idempotent.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1528,7 +1528,7 @@ async def run_server():
                     name="suggest_parents",
                     description="Find semantically similar notes by vector cosine similarity and suggest them as potential parent links. "
                                 "Returns top_n candidates ranked by similarity score, with same-core matches prioritized. "
-                                "Read-only — does not modify any files. Requires embeddings (prizma/sloi modes). "
+                                "Read-only вЂ” does not modify any files. Requires embeddings (prizma/sloi modes). "
                                 "Use this to discover hierarchy links for orphan notes; use suggest_metadata for broader classification.",
                     inputSchema={
                         "type": "object",
@@ -1562,7 +1562,7 @@ async def run_server():
                 types.Tool(
                     name="recalc_signs",
                     description="Reclassify all indexed files by computing their sign_auto from content embeddings vs core etalon vectors. "
-                                "Updates sign_auto and sign_source columns in the DB only — does not modify YAML files. "
+                                "Updates sign_auto and sign_source columns in the DB only вЂ” does not modify YAML files. "
                                 "Use dry_run=true to preview changes without writing. "
                                 "Run after calibrate_cores or after adding new notes. Not available in luca mode.",
                     inputSchema={
