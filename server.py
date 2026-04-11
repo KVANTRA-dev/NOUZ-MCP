@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz — Unified MCP Server for Obsidian.
+Nouz — Unified MCP Server for Obsidian
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
