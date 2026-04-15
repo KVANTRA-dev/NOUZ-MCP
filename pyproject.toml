@@ -25,12 +25,6 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: Markdown",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-
-[project.urls]
-Homepage = "https://kvantra-dev.github.io/nouz/"
-Repository = "https://github.com/KVANTRA-dev/NOUZ-MCP"
-Documentation = "https://github.com/KVANTRA-dev/NOUZ-MCP#readme"
-"Bug Tracker" = "https://github.com/KVANTRA-dev/NOUZ-MCP/issues"
 dependencies = [
     "mcp>=1.0.0",
     "aiofiles>=23.0.0",
@@ -38,6 +32,12 @@ dependencies = [
     "aiohttp>=3.9.0",
     "aiosqlite>=0.19.0",
 ]
+
+[project.urls]
+Homepage = "https://kvantra.tech"
+Repository = "https://github.com/KVANTRA-dev/NOUZ-MCP"
+Documentation = "https://github.com/KVANTRA-dev/NOUZ-MCP#readme"
+"Bug Tracker" = "https://github.com/KVANTRA-dev/NOUZ-MCP/issues"
 
 [project.optional-dependencies]
 dev = [
