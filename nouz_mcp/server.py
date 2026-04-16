@@ -1823,8 +1823,9 @@ async def run_server():
             types.Tool(
                 name="read_file",
                 description="Read an Obsidian markdown file and return its YAML frontmatter fields (type, level, sign, parents, tags) "
-                            "plus content body as JSON. Also re-indexes the file in the local DB. "
-                            "Read-only for the file itself. Use this to inspect any note before making changes.",
+                            "plus content body as JSON. Side effect: re-indexes the file in the local SQLite DB so subsequent "
+                            "suggest_metadata and suggest_parents calls use fresh data. Not destructive for the file itself. "
+                            "Use this to inspect any note before changes; use list_files for a broad overview without reading content.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1836,8 +1837,10 @@ async def run_server():
             types.Tool(
                 name="write_file",
                 description="Write or overwrite an Obsidian markdown file with YAML frontmatter and content body. "
-                            "Destructive: replaces file contents entirely. Syncs parents/parents_meta fields automatically "
-                            "and checks for DAG cycles before writing. Re-indexes the file in DB after write.",
+                            "DESTRUCTIVE: replaces the entire file — there is no append or merge. Syncs parents/parents_meta fields "
+                            "automatically and checks for DAG cycles before writing (returns error if cycle detected). "
+                            "Side effect: re-indexes the file in DB after write. "
+                            "Use read_file first to inspect current content; use suggest_metadata first to get optimal metadata.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1851,8 +1854,9 @@ async def run_server():
             types.Tool(
                 name="list_files",
                 description="List indexed Obsidian files with optional filters. Returns an array of {path, type, level, sign} objects. "
-                            "Use level/sign/subfolder to narrow results. Read-only. "
-                            "Use this instead of get_children when you need a broad overview rather than hierarchy traversal.",
+                            "Read-only, no side effects. Use level (1=core–5=artifact), sign (e.g. 'T'), or subfolder to narrow results. "
+                            "Set no_metadata=true to include files without YAML frontmatter (orphan files). "
+                            "Use this for a broad overview of the vault; use get_children for hierarchy traversal from a specific node.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1866,8 +1870,9 @@ async def run_server():
             types.Tool(
                 name="get_children",
                 description="Get all direct and transitive hierarchy children of a node in the DAG. "
-                            "Returns a flat list of relative paths. Read-only. "
-                            "Use this to explore what a node contains; use get_parents to see where a node belongs.",
+                            "Returns a flat list of relative paths. Read-only, no side effects. "
+                            "Use this to explore what a node contains; use get_parents to see where a node belongs; "
+                            "use list_files for a flat filtered overview without hierarchy context.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1879,8 +1884,9 @@ async def run_server():
             types.Tool(
                 name="get_parents",
                 description="Get parent links for a file from the DAG index. Returns an array of {entity, link_type} objects. "
-                            "Read-only. Use this to understand a node's position in the hierarchy; "
-                            "use get_children for the inverse direction.",
+                            "Read-only, no side effects. Use this to understand a node's position in the hierarchy; "
+                            "use get_children for the inverse direction (what this node contains); "
+                            "use suggest_parents to find semantically similar candidates for orphan notes.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1891,10 +1897,11 @@ async def run_server():
             ),
             types.Tool(
                 name="suggest_metadata",
-                description="Analyze a file's content and suggest metadata: type, sign, tags, semantic bridges, and hierarchy errors. "
-                            "Read-only -- does not modify the file. Requires embeddings for semantic features (prizma/sloi modes). "
+                description="Analyze a file's content and suggest metadata: domain sign, hierarchy level, tags, semantic bridges, "
+                            "and hierarchy errors (e.g. missing level, skipped level). Read-only — does not modify the file. "
+                            "Requires embeddings for semantic features (prizma/sloi modes). "
                             "Use this before write_file to validate or improve a note's classification. "
-                            "Pass context to override specific frontmatter fields for what-if analysis.",
+                            "Pass context to override specific frontmatter fields for what-if analysis (e.g. {sign: 'T'}).",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1906,9 +1913,10 @@ async def run_server():
             ),
             types.Tool(
                 name="embed",
-                description="Generate a vector embedding for the given text using the configured embedding provider (LM Studio, Ollama, or OpenAI-compatible). "
-                            "Returns {embedding: [...], dim: N}. Read-only, no side effects. "
-                            "Use this for ad-hoc similarity checks; for batch operations use index_all with with_embeddings=true.",
+                description="Generate a vector embedding for the given text using the configured embedding provider "
+                            "(LM Studio, Ollama, or OpenAI-compatible API). Returns {embedding: [...], dim: N}. "
+                            "Read-only, no side effects. Use this for ad-hoc similarity checks; "
+                            "for batch embedding operations on the entire vault, use index_all with with_embeddings=true instead.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1920,9 +1928,11 @@ async def run_server():
             types.Tool(
                 name="index_all",
                 description="Scan all markdown files in the vault and index them into the SQLite database. "
-                            "Reports orphaned parent links. Set with_embeddings=true to also compute/update vector embeddings "
-                            "(requires embedding provider; skips files whose embeddings are already fresh). "
-                            "Run this after adding or reorganizing notes. Safe to re-run -- idempotent.",
+                            "Reports orphaned parent links. Safe to re-run — idempotent. "
+                            "Set with_embeddings=true to also compute/update vector embeddings "
+                            "(slower, requires LM Studio/Ollama; skips files whose embeddings are already fresh). "
+                            "Run this after adding or reorganizing notes in Obsidian. "
+                            "Do NOT use this to search — use list_files or suggest_parents instead.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -1938,8 +1948,10 @@ async def run_server():
                     name="suggest_parents",
                     description="Find semantically similar notes by vector cosine similarity and suggest them as potential parent links. "
                                 "Returns top_n candidates ranked by similarity score, with same-core matches prioritized. "
-                                "Read-only -- does not modify any files. Requires embeddings (prizma/sloi modes). "
-                                "Use this to discover hierarchy links for orphan notes; use suggest_metadata for broader classification.",
+                                "Read-only — does not modify any files. Requires embeddings (prizma/sloi modes). "
+                                "Use this to discover hierarchy links for orphan notes; "
+                                "use suggest_metadata for broader classification (sign, level, bridges); "
+                                "use get_parents to retrieve existing parent links.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -1956,25 +1968,26 @@ async def run_server():
                 types.Tool(
                     name="calibrate_cores",
                     description="Recompute reference vector embeddings for all semantic cores defined in config.yaml etalons. "
-                                "Writes new vectors to the reference_vectors DB table and reports pairwise cosine similarities. "
-                                "Run this once after initial setup, or after changing etalon texts in config.yaml. "
-                                "Not available in luca mode.",
+                                "Writes new vectors to the reference_vectors DB table and reports pairwise cosine similarities "
+                                "(both raw and mean-centered). Use this once after initial setup, or after changing etalon texts in config.yaml. "
+                                "Not available in luca mode. Not destructive to user files — only updates DB.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_core_mix",
                     description="Recalculate core_mix bottom-up: quants (L4) -> modules (L3) -> patterns (L2). "
                                 "Each parent node gets a weighted average of its children's sign distributions. "
-                                "Writes updated core_mix to the DB (does not modify YAML files). "
+                                "Writes updated core_mix to the DB only — does not modify YAML files. "
                                 "Run after index_all with embeddings or after recalc_signs. Not available in luca mode.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_signs",
                     description="Reclassify all indexed files by computing their sign_auto from content embeddings vs core etalon vectors. "
-                                "Updates sign_auto and sign_source columns in the DB only -- does not modify YAML files. "
+                                "Updates sign_auto and sign_source columns in the DB only — does not modify YAML files. "
                                 "Use dry_run=true to preview changes without writing. "
-                                "Run after calibrate_cores or after adding new notes. Not available in luca mode.",
+                                "Run after calibrate_cores or after adding new notes. Not available in luca mode. "
+                                "For single-file classification, use suggest_metadata instead.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -1988,8 +2001,9 @@ async def run_server():
             types.Tool(
                 name="format_entity_compact",
                 description="Generate a compact structural formula for a note showing its position in the DAG: "
-                            "(children_signs)[own_sign]{parent_signs}. Read-only. "
-                            "Available in all modes. Use this to quickly visualize a node's graph neighborhood.",
+                            "(children_signs)[own_sign]{parent_signs}. Read-only, no side effects. "
+                            "Available in all modes. Use this to quickly visualize a node's graph neighborhood "
+                            "without reading the full file content.",
                 inputSchema={
                     "type": "object",
                     "properties": {

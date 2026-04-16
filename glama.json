@@ -1,18 +1,6 @@
 {
-  "schema_version": "v1",
-  "name_for_human": "Nouz",
-  "name_for_machine": "nouz",
-  "description": "Unified MCP server for semantic knowledge management in Obsidian. Three modes: LUCA (pure graph, no embeddings), PRIZMA (semantic classification, core_mix, drift detection), SLOI (strict 5-level DAG hierarchy). Runs 100% locally with LM Studio, Ollama, or any OpenAI-compatible embedding API. Key tools: suggest_metadata, suggest_parents, recalc_signs, recalc_core_mix, get_children, get_parents, index_all.",
-  "icon": "https://raw.githubusercontent.com/KVANTRA-dev/NOUZ-MCP/main/asset/icon_nouz.svg",
-  "homepage": "https://github.com/KVANTRA-dev/NOUZ-MCP",
-  "repository": "https://github.com/KVANTRA-dev/NOUZ-MCP",
-  "keywords": ["mcp", "obsidian", "knowledge-management", "semantic-search", "embeddings", "knowledge-graph", "local", "markdown", "note-taking"],
-  "installations": [
-    {
-      "type": "git",
-      "url": "https://github.com/KVANTRA-dev/NOUZ-MCP"
-    }
-  ],
-  "categories": ["Note Taking", "Knowledge & Memory", "File Systems", "Vector Databases", "RAG Systems"],
-  "platforms": ["Linux", "Apple", "Windows"]
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": [
+    "MariaBelkina"
+  ]
 }
