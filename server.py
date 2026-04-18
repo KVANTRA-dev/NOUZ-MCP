@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz -- Unified MCP Server for Obsidian. v2.2.0
+Nouz -- Unified MCP Server for Obsidian. v2.2.2
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.2.0"
+VERSION = "2.2.2"
 
 import asyncio
 import hashlib
@@ -1822,121 +1822,129 @@ async def run_server():
         tools = [
             types.Tool(
                 name="read_file",
-                description="Read an Obsidian markdown file and return its YAML frontmatter fields (type, level, sign, parents, tags) "
-                            "plus content body as JSON. Side effect: re-indexes the file in the local SQLite DB so subsequent "
-                            "suggest_metadata and suggest_parents calls use fresh data. Not destructive for the file itself. "
-                            "Use this to inspect any note before changes; use list_files for a broad overview without reading content.",
+                description="Read an Obsidian note and its YAML frontmatter. Returns a JSON object with parsed metadata fields "
+                            "(type, level, sign, parents, tags) and the note's full text content. "
+                            "Automatically re-indexes the file in the local database after reading, ensuring that subsequent calls "
+                            "to suggest_metadata and suggest_parents use up-to-date content. The file on disk is never modified. "
+                            "Use read_file to inspect a specific note before editing it; use list_files to browse the vault without reading content.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT, e.g. 'notes/my-note.md'"}
+                        "path": {"type": "string", "description": "Note path relative to the vault root, e.g. 'projects/machine-learning.md'"}
                     },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="write_file",
-                description="Write or overwrite an Obsidian markdown file with YAML frontmatter and content body. "
-                            "DESTRUCTIVE: replaces the entire file — there is no append or merge. Syncs parents/parents_meta fields "
-                            "automatically and checks for DAG cycles before writing (returns error if cycle detected). "
-                            "Side effect: re-indexes the file in DB after write. "
-                            "Use read_file first to inspect current content; use suggest_metadata first to get optimal metadata.",
+                description="Create or replace an Obsidian note with YAML frontmatter and body text. "
+                            "The entire file is overwritten — there is no append or partial update. "
+                            "Before writing, the server automatically syncs the parents and parents_meta fields for consistency "
+                            "and checks that the new hierarchy links would not create a DAG cycle (returns an error if a cycle is detected). "
+                            "After writing, the file is re-indexed in the database. "
+                            "Workflow: call suggest_metadata first to get recommended metadata, then write_file with the results.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
-                        "content": {"type": "string", "description": "Markdown body (without frontmatter delimiters)"},
-                        "metadata": {"type": "object", "description": "YAML frontmatter fields: type, level, sign, parents, tags, etc."}
+                        "path": {"type": "string", "description": "Note path relative to the vault root, e.g. 'projects/machine-learning.md'"},
+                        "content": {"type": "string", "description": "The note's body text in Markdown, without the frontmatter block (--- delimiters). This becomes the content below the YAML header."},
+                        "metadata": {"type": "object", "description": "YAML frontmatter fields to write. Supported keys: type (string), level (1-5), sign (string), parents (list of wikilinks), parents_meta (list of {entity, link_type}), tags (list of strings), status, color, and any custom keys."}
                     },
                     "required": ["path", "content"]
                 }
             ),
-            types.Tool(
+types.Tool(
                 name="list_files",
-                description="List indexed Obsidian files with optional filters. Returns an array of {path, type, level, sign} objects. "
-                            "Read-only, no side effects. Use level (1=core–5=artifact), sign (e.g. 'T'), or subfolder to narrow results. "
-                            "Set no_metadata=true to include files without YAML frontmetadata (orphan files). "
-                            "Use this for a broad overview of the vault; use get_children for hierarchy traversal from a specific node.",
+                description="List notes in the vault with optional filters. Returns an array of objects, each with path, type, level, and sign. "
+                            "Filter by hierarchy level (1=core, 2=pattern, 3=module, 4=quant, 5=artifact), by domain sign character "
+                            "(e.g. 'T', 'S'), or by subfolder. Set include_unindexed=true to also list files that have no YAML "
+                            "frontmatter (orphan files). This is the fastest way to get an overview of the vault; "
+                            "use get_children for hierarchy traversal from a specific note.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "no_metadata": {"type": "boolean", "description": "If true, include files without YAML frontmatter"},
-                        "level": {"type": "integer", "description": "Filter by hierarchy level (1=core, 2=pattern, 3=module, 4=quant, 5=artifact)"},
-                        "sign": {"type": "string", "description": "Filter by sign character (e.g. 'T' or 'S')"},
-                        "subfolder": {"type": "string", "description": "Restrict search to a subfolder within the vault"}
+                        "no_metadata": {"type": "boolean", "description": "Set true to include files that lack YAML frontmatter (orphan notes). By default, only indexed notes with metadata are returned."},
+                        "level": {"type": "integer", "description": "Filter by hierarchy level: 1=core, 2=pattern, 3=module, 4=quant, 5=artifact"},
+                        "sign": {"type": "string", "description": "Filter by domain sign character (e.g. 'T' for Technology). Matches both single and compound signs."},
+                        "subfolder": {"type": "string", "description": "Restrict listing to a subfolder within the vault. Paths are relative to the vault root."}
                     }
                 }
             ),
             types.Tool(
                 name="get_children",
-                description="Get all direct and transitive hierarchy children of a node in the DAG. "
-                            "Returns a flat list of relative paths. Read-only, no side effects. "
-                            "Use this to explore what a node contains; use get_parents to see where a node belongs; "
-                            "use list_files for a flat filtered overview without hierarchy context.",
+                description="Get all hierarchy descendants of a note — both direct children and their transitive children down the DAG. "
+                            "Returns a flat list of relative paths. Read-only, with no side effects. "
+                            "Use get_children to see everything contained under a note; use get_parents to traverse upward; "
+                            "use list_files for a flat filtered overview that doesn't depend on hierarchy position.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                        "path": {"type": "string", "description": "Note path relative to the vault root, e.g. 'science/thermodynamics.md'"}
                     },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="get_parents",
-                description="Get parent links for a file from the DAG index. Returns an array of {entity, link_type} objects. "
-                            "Read-only, no side effects. Use this to understand a node's position in the hierarchy; "
-                            "use get_children for the inverse direction (what this node contains); "
-                            "use suggest_parents to find semantically similar candidates for orphan notes.",
+                description="Get the hierarchy and relationship links pointing to a note from above. "
+                            "Returns an array of {entity, link_type} objects, where link_type is one of: "
+                            "hierarchy (structural, set by user), temporary (provisional link), "
+                            "semantic (AI-suggested content similarity), tag (shared tag concept), "
+                            "or analogy (structural isomorphism across domains). "
+                            "Read-only, with no side effects. Use get_parents to understand how a note fits into the graph; "
+                            "use get_children to traverse downward; use suggest_parents to find candidate parents for orphan notes.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                        "path": {"type": "string", "description": "Note path relative to the vault root, e.g. 'science/thermodynamics.md'"}
                     },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="suggest_metadata",
-                description="Analyze a file's content and suggest metadata: domain sign, hierarchy level, tags, semantic bridges, "
-                            "and hierarchy errors (e.g. missing level, skipped level). Read-only — does not modify the file. "
-                            "Requires embeddings for semantic features (prizma/sloi modes). "
-                            "Use this before write_file to validate or improve a note's classification. "
-                            "Pass context to override specific frontmatter fields for what-if analysis (e.g. {sign: 'T'}).",
+                description="Analyze a note's content and recommend metadata: domain sign, hierarchy level, tags, "
+                            "cross-domain semantic bridges, and hierarchy errors (e.g. missing level, skipped level). "
+                            "Read-only — never modifies the file. Requires an active embedding provider (prizma/sloi modes). "
+                            "Recommended workflow: call suggest_metadata before write_file to get optimal classification, "
+                            "then pass the returned suggestions as metadata to write_file. "
+                            "Optionally pass a context object to override specific frontmatter fields for what-if analysis.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
-                        "context": {"type": "object", "description": "Optional frontmatter overrides for what-if analysis (e.g. {sign: 'T'})"}
+                        "path": {"type": "string", "description": "Note path relative to the vault root"},
+                        "context": {"type": "object", "description": "Optional frontmatter overrides for what-if analysis. Any field can be overridden: sign, level, type, tags, etc. Example: {\"sign\": \"T\", \"level\": 4} tests how the note would behave if classified as Technology at quant level."}
                     },
                     "required": ["path"]
                 }
             ),
             types.Tool(
                 name="embed",
-                description="Generate a vector embedding for the given text using the configured embedding provider "
-                            "(LM Studio, Ollama, or OpenAI-compatible API). Returns {embedding: [...], dim: N}. "
-                            "Read-only, no side effects. Use this for ad-hoc similarity checks; "
-                            "for batch embedding operations on the entire vault, use index_all with with_embeddings=true instead.",
+                description="Generate a vector embedding for arbitrary text using the configured embedding provider. "
+                            "Returns an object with the embedding vector and its dimension: {embedding: [...], dim: N}. "
+                            "Read-only, with no side effects on the vault. "
+                            "Use embed for ad-hoc similarity checks between texts or to inspect vector representations. "
+                            "For bulk re-embedding of the entire vault, use index_all with with_embeddings=true instead.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "text": {"type": "string", "description": "Text to embed (will be truncated to ~2000 chars)"}
+                        "text": {"type": "string", "description": "Text to embed. Long texts are truncated to approximately 2000 characters."}
                     },
                     "required": ["text"]
                 }
             ),
             types.Tool(
                 name="index_all",
-                description="Scan all markdown files in the vault and index them into the SQLite database. "
-                            "Reports orphaned parent links. Safe to re-run — idempotent. "
-                            "Set with_embeddings=true to also compute/update vector embeddings "
-                            "(slower, requires LM Studio/Ollama; skips files whose embeddings are already fresh). "
-                            "Run this after adding or reorganizing notes in Obsidian. "
-                            "Do NOT use this to search — use list_files or suggest_parents instead.",
+                description="Scan every Markdown file in the vault and index its metadata and content into the local SQLite database. "
+                            "Reports any orphaned parent links (references to notes that don't exist). Safe to re-run at any time — idempotent. "
+                            "Set with_embeddings=true to also compute or refresh vector embeddings for each file (slower; requires a running "
+                            "embedding provider). Files with embeddings already up to date are skipped automatically. "
+                            "When to use: after adding new notes, reorganizing the vault, or when database state seems stale. "
+                            "Do NOT use index_all for search — use list_files for filtering or suggest_parents for semantic search.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "with_embeddings": {"type": "boolean", "description": "If true, compute embeddings for all files (slower, requires LM Studio/Ollama). Default false."}
+                        "with_embeddings": {"type": "boolean", "description": "Set true to compute or refresh vector embeddings for all files. Requires a running embedding provider. Defaults to false."}
                     }
                 }
             ),
@@ -1946,17 +1954,17 @@ async def run_server():
             tools.extend([
                 types.Tool(
                     name="suggest_parents",
-                    description="Find semantically similar notes by vector cosine similarity and suggest them as potential parent links. "
-                                "Returns top_n candidates ranked by similarity score, with same-core matches prioritized. "
-                                "Read-only — does not modify any files. Requires embeddings (prizma/sloi modes). "
-                                "Use this to discover hierarchy links for orphan notes; "
+                    description="Find notes with semantically similar content and suggest them as potential parent links for an orphan note. "
+                                "Returns up to top_n candidates ranked by cosine similarity score, with notes from the same domain core prioritized. "
+                                "Read-only — never modifies any file. Requires an active embedding provider (prizma/sloi modes). "
+                                "Use suggest_parents when a note has no parent links and you need hierarchy placement suggestions; "
                                 "use suggest_metadata for broader classification (sign, level, bridges); "
                                 "use get_parents to retrieve existing parent links.",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"},
-                            "top_n": {"type": "integer", "description": "Number of candidates to return (default 3)"}
+                            "path": {"type": "string", "description": "Note path relative to the vault root"},
+                            "top_n": {"type": "integer", "description": "Maximum number of candidate parents to return. Defaults to 3."}
                         },
                         "required": ["path"]
                     }
@@ -1967,31 +1975,33 @@ async def run_server():
             tools.extend([
                 types.Tool(
                     name="calibrate_cores",
-                    description="Recompute reference vector embeddings for all semantic cores defined in config.yaml etalons. "
-                                "Writes new vectors to the reference_vectors DB table and reports pairwise cosine similarities "
-                                "(both raw and mean-centered). Use this once after initial setup, or after changing etalon texts in config.yaml. "
-                                "Not available in luca mode. Not destructive to user files — only updates DB.",
+                    description="Compute reference vector embeddings for all semantic cores defined in the etalons section of config.yaml. "
+                                "Stores the resulting vectors in the database and reports pairwise cosine similarities "
+                                "between cores (both raw and mean-centered). Run this once after initial setup, "
+                                "and again after any changes to etalon texts. Not available in luca mode. "
+                                "Only modifies the reference_vectors database table — user files are never touched.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_core_mix",
-                    description="Recalculate core_mix bottom-up: quants (L4) -> modules (L3) -> patterns (L2). "
-                                "Each parent node gets a weighted average of its children's sign distributions. "
-                                "Writes updated core_mix to the DB only — does not modify YAML files. "
-                                "Run after index_all with embeddings or after recalc_signs. Not available in luca mode.",
+                    description="Recalculate core_mix values bottom-up through the hierarchy: quants (L4) to modules (L3) to patterns (L2). "
+                                "Each parent node receives a weighted average of its children's sign distributions, "
+                                "producing a measure of how much each domain is represented in that subtree. "
+                                "Updates the core_mix column in the database only — YAML frontmatter is never modified. "
+                                "Run after index_all with embeddings, or after recalc_signs. Not available in luca mode.",
                     inputSchema={"type": "object", "properties": {}}
                 ),
                 types.Tool(
                     name="recalc_signs",
-                    description="Reclassify all indexed files by computing their sign_auto from content embeddings vs core etalon vectors. "
-                                "Updates sign_auto and sign_source columns in the DB only — does not modify YAML files. "
-                                "Use dry_run=true to preview changes without writing. "
+                    description="Reclassify every indexed note by comparing its content embedding against the core etalon vectors. "
+                                "Updates the sign_auto and sign_source columns in the database — YAML frontmatter files are never modified. "
+                                "Set dry_run=true to preview what would change without writing anything. "
                                 "Run after calibrate_cores or after adding new notes. Not available in luca mode. "
-                                "For single-file classification, use suggest_metadata instead.",
+                                "For classifying a single note, use suggest_metadata instead.",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "dry_run": {"type": "boolean", "description": "If true, show what would change without writing to DB (default false)"}
+                            "dry_run": {"type": "boolean", "description": "Set true to preview classification changes without writing to the database. Defaults to false."}
                         }
                     }
                 ),
@@ -2000,14 +2010,16 @@ async def run_server():
         tools.append(
             types.Tool(
                 name="format_entity_compact",
-                description="Generate a compact structural formula for a note showing its position in the DAG: "
-                            "(children_signs)[own_sign]{parent_signs}. Read-only, no side effects. "
-                            "Available in all modes. Use this to quickly visualize a node's graph neighborhood "
-                            "without reading the full file content.",
+                description="Show a note's position in the knowledge graph as a compact one-line structural formula. "
+                            "The formula format is (children_signs)[own_sign]{parent_signs} — each bracket group shows "
+                            "the domain signs of entities in that role. For example, (TS)[S]{T} means: "
+                            "this note's children belong to domains T and S, the note itself is in domain S, "
+                            "and its parent is in domain T. Available in all modes. Read-only, with no side effects. "
+                            "Use this to quickly assess a note's graph context without reading the full file.",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Relative path from OBSIDIAN_ROOT"}
+                        "path": {"type": "string", "description": "Note path relative to the vault root"}
                     },
                     "required": ["path"]
                 }
