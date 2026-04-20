@@ -302,7 +302,7 @@ thresholds:
 | `get_children` | Traverse DAG downwards (all children) |
 | `get_parents` | Traverse DAG upwards (parents) |
 | `index_all` | Reindex the entire vault |
-| `format_entity_compact` | Entity formula: `(children)[entity]{parents}` |
+| `format_entity_compact` | Entity formula: `(children)[level·sign]{parents}` — empty brackets omitted |
 
 ### PRIZMA / SLOI
 

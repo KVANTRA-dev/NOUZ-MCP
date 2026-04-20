@@ -67,3 +67,10 @@ thresholds:
   # Analogy bridges connect notes from different cores with similar graph positions
   # (similar core_mix, level, degree, tags). Lower = more bridges, higher = stricter.
   structural_bridge_threshold: 0.55
+
+# Extra sign characters for parsing entity names (beyond etalon signs).
+# Used to extract signs from filenames like "Δ Thermodynamics" or "ΨΣ System".
+# Add any custom symbols you use in your vault — this is ONLY for name parsing,
+# NOT for classification. Core signs are always derived from etalons above.
+# Examples: "αβγδεζηθλμσφψω" for Greek letters, or "" if you use only ASCII signs.
+sign_chars: ""

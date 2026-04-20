@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz -- Unified MCP Server for Obsidian. v2.2.2
+Nouz -- Unified MCP Server for Obsidian. v2.2.3
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.2.2"
+VERSION = "2.2.3"
 
 import asyncio
 import hashlib
@@ -137,6 +137,7 @@ RULE = RULES.get(MODE, RULES["luca"])
 
 CORE_ETALON_TEXTS = {e["sign"]: e["text"] for e in CONFIG.get("etalons", DEFAULT_CONFIG["profiles"]["default"]["etalons"])}
 CORE_SIGNS = set(CORE_ETALON_TEXTS.keys())
+CONFIG_SIGN_CHARS = set(CONFIG.get("sign_chars", ""))
 LEVEL_MAP = CONFIG.get("levels", DEFAULT_CONFIG["levels"])
 SIGN_SPREAD_THRESHOLD = CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("sign_spread", 0.05)
 CONFIDENT_COSINE_THRESHOLD = CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("confident_cosine", 0.6)
@@ -1572,21 +1573,31 @@ def _resolve_entity_meta(entity: str) -> Dict[str, str]:
         except Exception:
             pass
 
-    all_known_signs = CORE_SIGNS.union({"Ψ", "Δ", "Σ", "σ", "β", "δ", "ζ", "λ", "μ", "φ"})
+    all_known_signs = CORE_SIGNS.union(CONFIG_SIGN_CHARS)
     signs = "".join(ch for ch in entity if ch in all_known_signs)
     return {"sign": signs, "type": "", "level": ""}
 
 async def format_entity_compact(meta: Dict[str, Any], db_path: str = "") -> str:
-    """Format entity formula showing link types: (children)[entity]{parents}"""
+    """Format entity formula: (children)[level·sign]{parents}. Empty brackets omitted."""
     children_by_link: Dict[str, List[Dict]] = {}
     
     if db_path:
         file_path = meta.get("path", "")
         if file_path:
+            root = OBSIDIAN_ROOT.replace("/", "\\")
+            normalized_path = file_path.replace("/", "\\")
+            if normalized_path.startswith(root):
+                db_key = normalized_path[len(root):].lstrip("\\")
+            else:
+                db_key = normalized_path
+            
+            if not db_key.startswith("obsidian\\"):
+                db_key = "obsidian\\" + db_key
+            
             async with aiosqlite.connect(db_path) as db:
                 async with db.execute(
                     'SELECT child_path, link_type FROM links WHERE parent_path = ?',
-                    (file_path,)
+                    (db_key,)
                 ) as cur:
                     rows = await cur.fetchall()
                 
@@ -1604,34 +1615,24 @@ async def format_entity_compact(meta: Dict[str, Any], db_path: str = "") -> str:
                         "level": child_level
                     })
     
-    children_parts = []
+    all_children_sign_counts: Dict[str, int] = {}
     for link_type in ["hierarchy", "semantic", "analogy", "temporary", "error"]:
-        if link_type not in children_by_link:
-            continue
-            
-        items = children_by_link[link_type]
-        sign_counts: Dict[str, int] = {}
-        for item in items:
+        for item in children_by_link.get(link_type, []):
             sign = item.get("sign", "")
             if sign:
-                sign_counts[sign] = sign_counts.get(sign, 0) + 1
-        
-        if not sign_counts:
-            continue
-            
+                all_children_sign_counts[sign] = all_children_sign_counts.get(sign, 0) + 1
+
+    if all_children_sign_counts:
         parts = []
-        for sign, count in sign_counts.items():
-            sign_str = f"{count}{sign}" if count > 1 else sign
-            parts.append(sign_str)
-        
-        link_tag = f"{link_type[0]}:" if link_type != "hierarchy" else ""
-        children_parts.append(f"({link_tag}{''.join(parts)})")
-    
-    children_str = "".join(children_parts) if children_parts else "()"
+        for sign, count in all_children_sign_counts.items():
+            parts.append(f"{count}{sign}" if count > 1 else sign)
+        children_str = f"({''.join(parts)})"
+    else:
+        children_str = ""
     
     own_sign = str(meta.get("sign", "")).strip()
     own_level = _get_level_from_meta(meta)
-    entity_str = f"[{own_sign}]"
+    entity_str = f"[{own_level}{own_sign}]"
     
     parents_by_link: Dict[str, List[Dict]] = {}
     yaml_parents = _get_parents_meta(meta)
@@ -1653,30 +1654,20 @@ async def format_entity_compact(meta: Dict[str, Any], db_path: str = "") -> str:
                     "level": p_level
                 })
     
-    parents_parts = []
+    all_parents_sign_counts: Dict[str, int] = {}
     for link_type in ["hierarchy", "temporary", "semantic", "analogy", "error"]:
-        if link_type not in parents_by_link:
-            continue
-            
-        items = parents_by_link[link_type]
-        sign_counts: Dict[str, int] = {}
-        for item in items:
+        for item in parents_by_link.get(link_type, []):
             sign = item.get("sign", "")
             if sign:
-                sign_counts[sign] = sign_counts.get(sign, 0) + 1
-        
-        if not sign_counts:
-            continue
-            
+                all_parents_sign_counts[sign] = all_parents_sign_counts.get(sign, 0) + 1
+
+    if all_parents_sign_counts:
         parts = []
-        for sign, count in sign_counts.items():
-            sign_str = f"{count}{sign}" if count > 1 else sign
-            parts.append(sign_str)
-        
-        link_tag = f"{link_type[0]}:" if link_type != "hierarchy" else ""
-        parents_parts.append(f"{{{link_tag}{''.join(parts)}}}")
-    
-    parents_str = "".join(parents_parts) if parents_parts else "{}"
+        for sign, count in all_parents_sign_counts.items():
+            parts.append(f"{count}{sign}" if count > 1 else sign)
+        parents_str = "{" + "".join(parts) + "}"
+    else:
+        parents_str = ""
     
     return f"{children_str}{entity_str}{parents_str}"
 
@@ -2011,10 +2002,10 @@ types.Tool(
             types.Tool(
                 name="format_entity_compact",
                 description="Show a note's position in the knowledge graph as a compact one-line structural formula. "
-                            "The formula format is (children_signs)[own_sign]{parent_signs} — each bracket group shows "
-                            "the domain signs of entities in that role. For example, (TS)[S]{T} means: "
-                            "this note's children belong to domains T and S, the note itself is in domain S, "
-                            "and its parent is in domain T. Available in all modes. Read-only, with no side effects. "
+                            "The format is (children)[level·sign]{parents} — empty brackets are omitted. "
+                            "For example, (2A3B)[4C]{D} means: this note has 2 children with sign A and 3 with sign B, "
+                            "is itself at level 4 with sign C, and its parent has sign D. "
+                            "Available in all modes. Read-only, with no side effects. "
                             "Use this to quickly assess a note's graph context without reading the full file.",
                 inputSchema={
                     "type": "object",
