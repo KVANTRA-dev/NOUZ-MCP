@@ -67,7 +67,7 @@ def make_md(rel_path: str, content: str = "", **meta) -> Path:
 async def test_version():
     section("VERSION")
     try:
-        assert server.VERSION == "2.2.3", f"Expected 2.2.3, got {server.VERSION}"
+        assert server.VERSION == "2.3.0", f"Expected 2.3.0, got {server.VERSION}"
         ok(f"VERSION == {server.VERSION}")
     except AssertionError as e:
         fail("VERSION check", str(e))
@@ -93,14 +93,12 @@ async def test_safe_path():
     section("_safe_path (path traversal guard)")
     root = str(TEST_ROOT)
 
-    # Valid path
     p = server._safe_path(root, "notes/test.md")
     if p is not None:
         ok("valid relative path accepted")
     else:
         fail("valid path", "returned None for valid path")
 
-    # Traversal attempt
     p2 = server._safe_path(root, "../../etc/passwd")
     if p2 is None:
         ok("path traversal blocked")
@@ -130,7 +128,6 @@ async def test_dump_metadata():
     except AssertionError as e:
         fail("_dump_metadata basic", str(e))
 
-    # Special chars in strings
     meta2 = {"type": "quant", "level": 4, "sign": "T", "parents": ["My: Special#Note"]}
     try:
         result2 = server._dump_metadata(meta2)
@@ -139,7 +136,6 @@ async def test_dump_metadata():
     except AssertionError as e:
         fail("_dump_metadata special chars", str(e))
 
-    # KEY_ORDER preserved
     try:
         lines = result.split("\n")
         keys_in_order = [l.split(":")[0].strip() for l in lines if ":" in l and not l.startswith("-")]
@@ -151,10 +147,74 @@ async def test_dump_metadata():
         fail("KEY_ORDER", str(e))
 
 
+async def test_dump_metadata_whitelist():
+    section("_dump_metadata whitelist (internal fields excluded)")
+
+    meta = {
+        "type": "quant",
+        "level": 4,
+        "sign": "T",
+        "sign_source": "auto",
+        "sign_auto": "T",
+        "core_mix": {"T": 80.0, "S": 20.0},
+        "path": "/some/path.md",
+        "content": "this should not appear in YAML",
+        "parents": ["Science"],
+    }
+    try:
+        result = server._dump_metadata(meta)
+        assert "sign_source" not in result, "sign_source leaked into YAML"
+        assert "sign_auto" not in result, "sign_auto leaked into YAML"
+        assert "core_mix" not in result, "core_mix leaked into YAML"
+        assert "path:" not in result, "path leaked into YAML"
+        assert "content:" not in result, "content leaked into YAML"
+        assert "this should not appear" not in result, "content value leaked into YAML"
+        assert "type: quant" in result
+        assert "sign: T" in result
+        assert "parents:" in result
+        ok("whitelist blocks sign_source, sign_auto, core_mix, path, content")
+    except AssertionError as e:
+        fail("_dump_metadata whitelist", str(e))
+
+
+async def test_strip_formula_html():
+    section("_strip_formula_html (remove <details> blocks)")
+
+    text_with_formula = 'Some content\n<details><summary>(3T2S)[TS]{H}</summary>extra</details>\nMore content'
+    try:
+        result = server._strip_formula_html(text_with_formula)
+        assert "<details>" not in result, "details tag not removed"
+        assert "</details>" not in result, "closing details tag not removed"
+        assert "(3T2S)" not in result, "formula content not removed"
+        assert "Some content" in result, "real content was removed"
+        assert "More content" in result, "real content was removed"
+        ok("<details> formula block stripped, content preserved")
+    except AssertionError as e:
+        fail("_strip_formula_html", str(e))
+
+    text_without_formula = "Just normal text\nNo formulas here"
+    try:
+        result = server._strip_formula_html(text_without_formula)
+        assert result == text_without_formula, "text without formula was modified"
+        ok("text without <details> passes through unchanged")
+    except AssertionError as e:
+        fail("_strip_formula_html passthrough", str(e))
+
+    text_multiple = 'A\n<details>block1</details>\nB\n<details>block2</details>\nC'
+    try:
+        result = server._strip_formula_html(text_multiple)
+        assert "<details>" not in result
+        assert "block1" not in result
+        assert "block2" not in result
+        assert "A" in result and "B" in result and "C" in result
+        ok("multiple <details> blocks all removed")
+    except AssertionError as e:
+        fail("_strip_formula_html multiple", str(e))
+
+
 async def test_sync_parents_fields():
     section("_sync_parents_fields")
 
-    # parents as plain strings -> parents_meta auto-built
     meta = {"parents": ["Science", "Math"]}
     synced = server._sync_parents_fields(meta)
     try:
@@ -163,7 +223,6 @@ async def test_sync_parents_fields():
     except AssertionError as e:
         fail("plain parents", str(e))
 
-    # parents_meta takes precedence
     meta2 = {
         "parents_meta": [{"entity": "Science", "link_type": "hierarchy"}],
         "parents": ["OldValue"]
@@ -210,6 +269,34 @@ async def test_cosine():
         fail("cosine empty", str(e))
 
 
+async def test_mean_center():
+    section("_mean_center (anisotropy correction)")
+
+    vecs = {
+        "A": [1.0, 0.0],
+        "B": [0.0, 1.0],
+    }
+    try:
+        centered = server._mean_center(vecs)
+        assert len(centered) == 2
+        mean = [0.5, 0.5]
+        for k in centered:
+            expected = [vecs[k][i] - mean[i] for i in range(2)]
+            for i in range(2):
+                assert abs(centered[k][i] - expected[i]) < 1e-6
+        ok("mean subtracted correctly from 2 vectors")
+    except AssertionError as e:
+        fail("_mean_center", str(e))
+
+    single = {"X": [3.0, 4.0]}
+    try:
+        result = server._mean_center(single)
+        assert result == single
+        ok("single vector passes through unchanged")
+    except AssertionError as e:
+        fail("_mean_center single", str(e))
+
+
 async def test_db_init():
     section("Database initialization")
     try:
@@ -230,7 +317,6 @@ async def test_read_write_file():
 
     p = TEST_ROOT / "test_note.md"
 
-    # Write
     meta = {"type": "quant", "level": 4, "sign": "T", "parents": ["Science"]}
     success, err = await server.write_file_with_metadata(p, "Hello world", meta, DB_PATH)
     try:
@@ -240,7 +326,6 @@ async def test_read_write_file():
         fail("write_file", str(e))
         return
 
-    # Read back
     result = await server.read_file_with_metadata(p)
     try:
         assert result.get("type") == "quant"
@@ -251,7 +336,6 @@ async def test_read_write_file():
     except AssertionError as e:
         fail("read_file content", str(e))
 
-    # DB indexed
     import aiosqlite
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT type, level, sign FROM files WHERE path=?", (str(p),)) as cur:
@@ -269,7 +353,6 @@ async def test_read_write_file():
 async def test_parent_child_links():
     section("Parent/child links in DB")
 
-    # Create parent
     parent_p = TEST_ROOT / "ParentNote.md"
     await server.write_file_with_metadata(
         parent_p, "parent content",
@@ -277,7 +360,6 @@ async def test_parent_child_links():
         DB_PATH
     )
 
-    # Create child pointing to parent
     child_p = TEST_ROOT / "ChildNote.md"
     await server.write_file_with_metadata(
         child_p, "child content",
@@ -298,7 +380,6 @@ async def test_parent_child_links():
     except AssertionError as e:
         fail("parent-child link", str(e))
 
-    # get_children / get_parents
     children = await server._get_db_children(DB_PATH, str(parent_p))
     try:
         assert str(child_p) in children, f"child not in children list: {children}"
@@ -329,7 +410,6 @@ async def test_cycle_detection():
         DB_PATH
     )
 
-    # A -> B would create a cycle (B already has A as parent)
     has_cycle = await server._check_cycle_exists(DB_PATH, str(b), str(a))
     try:
         assert has_cycle, "cycle not detected"
@@ -337,10 +417,8 @@ async def test_cycle_detection():
     except AssertionError as e:
         fail("cycle detection", str(e))
 
-    # No cycle: fresh nodes
     no_cycle = await server._check_cycle_exists(DB_PATH, str(a), str(b))
     try:
-        # a->b is the existing direction (b is child of a) - not a cycle from a's perspective
         ok(f"non-cycle check: {no_cycle} (normal direction)")
     except Exception as e:
         fail("non-cycle check", str(e))
@@ -375,21 +453,18 @@ async def test_serialize():
 async def test_list_files():
     section("list_files (scan vault)")
 
-    # Create some notes
     make_md("notes/alpha.md", "alpha content", type="quant", level=4, sign="T")
     make_md("notes/beta.md", "beta content", type="module", level=3, sign="S")
     make_md("notes/gamma.md", "gamma content", type="quant", level=4, sign="T")
 
-    # Scan directory
     root = Path(os.environ["OBSIDIAN_ROOT"])
     md_files = list(root.rglob("*.md"))
     try:
-        assert len(md_files) >= 3, f"Expected ≥3 .md files, found {len(md_files)}"
+        assert len(md_files) >= 3, f"Expected >=3 .md files, found {len(md_files)}"
         ok(f"found {len(md_files)} .md files in vault")
     except AssertionError as e:
         fail("list_files scan", str(e))
 
-    # Check sign filter logic (manual)
     sign_t = [f for f in md_files if "alpha" in f.name or "gamma" in f.name]
     try:
         assert len(sign_t) >= 2
@@ -401,7 +476,6 @@ async def test_list_files():
 async def test_orphaned_links():
     section("Orphaned link detection")
 
-    # Insert a link pointing to a non-existent parent
     import aiosqlite
     ghost_parent = str(TEST_ROOT / "GhostParent.md")
     real_child = str(TEST_ROOT / "ChildNote.md")
@@ -422,6 +496,28 @@ async def test_orphaned_links():
         fail("orphaned links", str(e))
 
 
+async def test_dedup_by_sign():
+    section("_dedup_by_sign (sign aggregation)")
+
+    if not hasattr(server, '_dedup_by_sign'):
+        ok("_dedup_by_sign not in luca mode (skipped)")
+        return
+
+    try:
+        items = [
+            {"sign": "T", "name": "a"},
+            {"sign": "T", "name": "b"},
+            {"sign": "S", "name": "c"},
+            {"sign": "T", "name": "d"},
+        ]
+        result = server._dedup_by_sign(items)
+        signs_only = [r.get("sign", r) if isinstance(r, dict) else r for r in result]
+        assert signs_only == ["T", "S"], f"Expected ['T', 'S'], got {signs_only}"
+        ok("_dedup_by_sign aggregates signs with count")
+    except Exception as e:
+        fail("_dedup_by_sign", str(e))
+
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 async def main():
@@ -434,8 +530,11 @@ async def main():
     await test_mode_defaults()
     await test_safe_path()
     await test_dump_metadata()
+    await test_dump_metadata_whitelist()
+    await test_strip_formula_html()
     await test_sync_parents_fields()
     await test_cosine()
+    await test_mean_center()
     await test_db_init()
     await test_read_write_file()
     await test_parent_child_links()
@@ -443,6 +542,7 @@ async def main():
     await test_serialize()
     await test_list_files()
     await test_orphaned_links()
+    await test_dedup_by_sign()
 
     print(f"\n{'-'*42}")
     total = PASS + FAIL
@@ -453,7 +553,6 @@ async def main():
             print(f"    \033[31m[FAIL]\033[0m {name}: {reason}")
     print()
 
-    # Cleanup
     shutil.rmtree(str(TEST_ROOT), ignore_errors=True)
 
     return FAIL

@@ -4,15 +4,15 @@
   "title": "Nouz",
   "description": "Semantic knowledge engine for Obsidian — vector embeddings, DAG hierarchy, auto-classification, and cross-domain bridge detection",
   "repository": {
-    "url": "https://github.com/KVANTRA-dev/nouz-mcp",
+    "url": "https://github.com/KVANTRA-dev/NOUZ-MCP",
     "source": "github"
   },
-  "version": "2.2.2",
+  "version": "2.3.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "nouz-mcp",
-      "version": "2.2.2",
+      "version": "2.3.0",
       "transport": {
         "type": "stdio"
       },

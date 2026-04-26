@@ -8,6 +8,10 @@ env/
 venv/
 .venv/
 
+# Distribution
+dist/
+*.egg-info/
+
 # MCP servers
 .env
 .mcpregistry_*
@@ -18,6 +22,21 @@ venv/
 *.swp
 *.swo
 
+# Build artifacts
+dist/
+*.egg-info/
+
+# Runtime data
+obsidian/
+*.db
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime
+obsidian/
+*.db
+
+# Local test with hardcoded paths
+test_server_quick.py
