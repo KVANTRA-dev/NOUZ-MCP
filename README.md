@@ -45,8 +45,6 @@ NOUZ даёт агенту семантические координаты. Ка
 
 **Три типа мостов** находят связи между заметками из разных доменов: семантические (тексты близки), теговые (концепты пересекаются), аналогические (похожая роль в графе).
 
-> Вдохновлено исследованием рекурсивной самоорганизации — [статья на Zenodo](https://doi.org/10.5281/zenodo.19595850).
-
 ---
 
 ## Быстрый старт
@@ -102,6 +100,8 @@ OBSIDIAN_ROOT=./vault python server.py
 | `list_files` | Список с фильтрами по уровню, знаку |
 | `get_children` / `get_parents` | Траверс графа |
 | `suggest_parents` | Найти родителей для сироты |
+| `add_entity` | Создать сущность в один шаг (авто sign, tags, parents) |
+| `process_orphans` | Автозаполнение файлов без разметки |
 
 ---
 
@@ -112,20 +112,23 @@ OBSIDIAN_ROOT=./vault python server.py
 ```yaml
 mode: prizma
 
-etalons:
-  - sign: T
-    name: Технология
-    text: "программирование архитектура инфраструктура машинное обучение нейросети алгоритмы"
+  etalons:
   - sign: S
-    name: Наука
-    text: "физика математика космология научная методология данные эксперимент"
-  - sign: H
-    name: Гуманитарные
-    text: "философия психология история литература этика когнитивные науки"
+    name: Systems Thinking
+    text: "methodology feedback loops emergence holism mental models leverage points cybernetics synergetics nonlinear systems self-regulation bifurcation"
+  - sign: D
+    name: Data & Science
+    text: "physics chemistry biology mathematics cosmology quantum mechanics natural sciences research methodology"
+  - sign: E
+    name: Engineering
+    text: "programming software architecture infrastructure machine learning neural networks algorithms frameworks database cloud computing"
 
 thresholds:
+  sign_spread: 0.05
   confident_spread: 60.0
+  pattern_second_sign_threshold: 30.0
   semantic_bridge_threshold: 0.55
+  structural_bridge_threshold: 0.55
 ```
 
 После настройки запустите `calibrate_cores` — сервер создаст эталонные векторы.
@@ -134,7 +137,7 @@ thresholds:
 | --- | --- | --- |
 | `OBSIDIAN_ROOT` | `./obsidian` | Путь к хранилищу |
 | `MODE` | `luca` | `luca`, `prizma` или `sloi` |
-| `EMBED_PROVIDER` | `openai` | `openai`, `lmstudio`, `ollama`, `gigachat` |
+| `EMBED_PROVIDER` | `openai` | `openai`, `lmstudio`, `ollama` |
 | `EMBED_API_URL` | `http://127.0.0.1:1234/v1` | Эндпоинт для эмбеддингов |
 | `EMBED_API_KEY` | *(пусто)* | API-ключ, если нужен |
 | `EMBED_MODEL` | *(пусто)* | Имя модели |

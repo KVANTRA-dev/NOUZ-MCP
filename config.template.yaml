@@ -84,25 +84,5 @@ sign_chars: ""
 # Higher values (70-80) are stricter — fewer auto signs, more weak_auto.
 confident_spread: 60.0
 
-# ============================================================================
-# Lenses (prizma sub-modes)
-# Optional. Define perspective sub-modes within prizma mode.
-# Each lens has a name, keywords (for auto-selection via embedding similarity),
-# and a description. When a user query matches a lens's keywords, the server
-# can use that context internally. Lenses are NOT exposed as MCP tools.
-# Leave empty ([]) to disable.
-# ============================================================================
-lenses:
-  - name: Research
-    keywords: ["analyze", "compare", "investigate", "explore", "patterns", "connections", "understand", "literature", "review", "evidence"]
-    description: "Deep investigation — finding patterns, building understanding, exploring connections"
-  - name: Build
-    keywords: ["create", "implement", "write", "design", "develop", "build", "code", "structure", "compose", "draft"]
-    description: "Constructive work — writing, coding, designing, building something new"
-  - name: Navigate
-    keywords: ["find", "search", "locate", "where", "what", "which", "list", "show", "get", "lookup"]
-    description: "Quick navigation — finding specific information, locating resources"
-
-# Threshold for auto-selecting a lens by query embedding similarity.
-# If cosine(query, lens_keywords) >= linza_threshold → that lens is selected.
-linza_threshold: 0.65
+# Lenses moved to separate PRIZMA server (LINZA).
+# See: https://github.com/KVANTRA-dev/LINZA
