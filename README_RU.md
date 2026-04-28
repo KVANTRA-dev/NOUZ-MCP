@@ -10,6 +10,8 @@
 [![PyPI](https://img.shields.io/badge/pypi-nouz--mcp-orange.svg)](https://pypi.org/project/nouz-mcp/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19595850.svg)](https://doi.org/10.5281/zenodo.19595850)
 
+🇬🇧 [English version](README_EN.md)
+
 ---
 
 ## Зачем нужен Nouz
@@ -151,6 +153,20 @@ thresholds:
 После настройки запустите `calibrate_cores` — сервер создаст эталонные векторы.
 Проверьте попарные косинусы: mean-centered между разными доменами должен быть
 заметно ниже сырого. Если все пары примерно одинаковые — усильте различия в текстах.
+
+### Реальный пример расчёта
+
+Вот фактические результаты для эталонов S/D/E с моделью `text-embedding-granite-embedding-278m-multilingual`:
+
+```
+=== Pairwise Cosine (raw) ===
+S↔D: 0.5890    S↔E: 0.5853    D↔E: 0.6011
+
+=== Pairwise Cosine (mean-centered) ===
+S↔D: -0.5051   S↔E: -0.5120   D↔E: -0.4827
+```
+
+Отрицательные mean-centered значения — отличный результат: ядра семантически хорошо разделены. Самоклассификация: S→99.2%, D→97.6%, E→96.9%.
 
 | Переменная | По умолчанию | Описание |
 | --- | --- | --- |

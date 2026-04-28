@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nouz-mcp"
-version = "2.5.0"
+version = "2.5.1"
 description = "MCP server for Obsidian — semantic knowledge graph with auto-classification, DAG hierarchy, and cross-domain bridge detection"
-readme = "README.md"
+readme = "README_EN.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "KVANTRA-dev", email = "your-email@example.com"}
+    {name = "KVANTRA-dev", email = "belkinamariaigorevna@yandex.ru"}
 ]
 keywords = ["mcp", "obsidian", "knowledge-graph", "semantic-classification", "rag", "llm", "notes", "pkm", "embeddings", "dag"]
 classifiers = [

@@ -18,20 +18,37 @@ meta_root: ""
 # Semantic etalons (optional) — for better semantic classification
 # You can start with just level/type in YAML, etalons are optional
 # Recommended: use distinct domains with low cosine similarity between them.
-# This is an example of an interdisciplinary knowledge base structure:
+# Write descriptive paragraphs, NOT keyword lists. Each etalon should capture
+# the ESSENCE of the domain in 2-3 sentences, using domain-specific jargon
+# and explicit boundary statements ("not X and not Y").
 etalons:
-  - sign: T
-    name: Technology & Engineering
-    text: "programming software architecture infrastructure machine learning neural networks algorithms frameworks database cloud computing code execution server development automation"
   - sign: S
-    name: Science & Mathematics
-    text: "physics chemistry biology mathematics formal logic theorems cosmology quantum mechanics natural sciences research methodology physics equation variable formula calculation"
-  - sign: H
-    name: Humanities & Arts
-    text: "philosophy psychology sociology history literature art culture ethics human behavior cognitive science epistemology semantics language linguistics"
-  - sign: B
-    name: Business & Economics
-    text: "management strategy finance markets entrepreneurship economics operations leadership marketing product development sales resources investment"
+    name: Systems Thinking
+    text: >
+      Methodology for analysing complex objects: feedback loops,
+      emergent properties, self-regulation, bifurcation points.
+      Cybernetics, synergetics, dissipative structures, catastrophe
+      theory, autopoiesis — tools for understanding how the whole
+      exceeds the sum of its parts. Not data and not code — a way
+      of thinking about how parts form a whole and why systems
+      behave non-linearly.
+  - sign: D
+    name: Data & Science
+    text: >
+      Physics and cosmology: from subatomic particles to the large-scale
+      structure of the Universe. Lagrangians, curvature tensors, scattering
+      cross-sections, quarks, bosons, fermions, plasma, vacuum fluctuations,
+      cosmic microwave background, cosmological constant, decoherence.
+      Pure science about the nature of matter, energy and spacetime.
+  - sign: E
+    name: Engineering
+    text: >
+      Software engineering, machine learning and infrastructure: writing
+      and debugging code, deployment, containerisation, neural networks,
+      inference, tokenisation, data serialisation, microservices, CI/CD,
+      automated testing, refactoring, Git, Docker, Kubernetes, APIs.
+      The practical discipline of building computational systems from
+      architecture to production.
 
 levels:
   core: 1
@@ -56,7 +73,7 @@ thresholds:
 
   # Minimum normalized percentage for a core to appear in the sign.
   # After spread-normalization: if adjusted_score / total * 100 >= this threshold,
-  # the core is included. Allows compound signs like "TS" when two cores both score ≥ 30%.
+  # the core is included. Allows compound signs like "SE" when two cores both score ≥ 30%.
   pattern_second_sign_threshold: 30.0
 
   # Minimum cosine similarity between two notes to propose a semantic bridge.
@@ -68,8 +85,14 @@ thresholds:
   # (similar core_mix, level, degree, tags). Lower = more bridges, higher = stricter.
   structural_bridge_threshold: 0.55
 
+  # Minimum cosine similarity to auto-link a file to a parent.
+  # Used by process_orphans and add_entity when auto_parents=true.
+  # Raw cosine (no same-core bonus) — ensures meaningful semantic proximity.
+  # Same-core is used as tiebreaker when scores are equal, not as a score booster.
+  parent_link_threshold: 0.55
+
 # Extra sign characters for parsing entity names (beyond etalon signs).
-# Used to extract signs from filenames like "Δ Thermodynamics" or "ΨΣ System".
+# Used to extract signs from filenames like "S Thermodynamics" or "SE System".
 # Add any custom symbols you use in your vault — this is ONLY for name parsing,
 # NOT for classification. Core signs are always derived from etalons above.
 # Examples: "αβγδεζηθλμσφψω" for Greek letters, or "" if you use only ASCII signs.

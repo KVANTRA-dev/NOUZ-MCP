@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz -- Unified MCP Server for Obsidian. v2.5.0
+Nouz -- Unified MCP Server for Obsidian. v2.5.1
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 
 import asyncio
 import hashlib
@@ -42,7 +42,7 @@ DEFAULT_CONFIG = {
     "meta_root": "",
     "profiles": {
         "default": {
-    "mode": "luca",
+            "mode": "prizma",
             "etalons": []
         }
     },
@@ -59,7 +59,8 @@ DEFAULT_CONFIG = {
         "confident_spread": 60.0,
         "pattern_second_sign_threshold": 30.0,
         "semantic_bridge_threshold": 0.55,
-        "structural_bridge_threshold": 0.55
+        "structural_bridge_threshold": 0.55,
+        "parent_link_threshold": 0.55
     }
 }
 
@@ -180,6 +181,7 @@ def _get_type_by_level(level: int) -> str:
 PATTERN_SECOND_SIGN_THRESHOLD = float(CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("pattern_second_sign_threshold", 30.0))
 SEMANTIC_BRIDGE_THRESHOLD = CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("semantic_bridge_threshold", 0.55)
 STRUCTURAL_BRIDGE_THRESHOLD = float(CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("structural_bridge_threshold", 0.55))
+PARENT_LINK_THRESHOLD = float(CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("parent_link_threshold", 0.55))
 
 # Link types visible in entity formula (format_entity_compact)
 VISIBLE_LINK_TYPES = {"hierarchy", "semantic", "temporary"}
@@ -2238,8 +2240,14 @@ async def _process_orphans(
             fm = yaml.safe_load(raw[4:end]) or {}
             content = raw[end + 5:]
             sign = str(fm.get("sign", "")).strip()
+            level = fm.get("level", 0)
+            if isinstance(level, str):
+                level = int(level) if level.isdigit() else 0
+            has_parents = bool(fm.get("parents") or fm.get("parents_meta"))
             if not sign:
-                orphans.append((p, raw, fm, content))
+                orphans.append((p, raw, fm, content, "no_sign"))
+            elif level >= 2 and not has_parents:
+                orphans.append((p, raw, fm, content, "no_parents"))
         except Exception:
             continue
         if len(orphans) >= limit:
@@ -2249,22 +2257,25 @@ async def _process_orphans(
         return {"processed": 0, "orphans": []}
 
     results = []
-    for p, raw, fm, content in orphans:
+    for p, raw, fm, content, reason in orphans:
         rel = str(p.relative_to(root))
         if not content:
             content = ""
-        
+
         level = _get_level_from_meta(fm)
-        sign_result = await _determine_sign_smart(content, {**fm, "path": str(p)}, db_path, level=level)
-        
+
+        if reason == "no_sign":
+            sign_result = await _determine_sign_smart(content, {**fm, "path": str(p)}, db_path, level=level)
+        else:
+            sign_result = {"actual_sign": fm.get("sign", ""), "source": "existing", "artifact_sign": fm.get("artifact_sign", "")}
+
         tags = fm.get("tags", [])
         if not tags and content:
             tags = await _extract_tags(content)
-        
+
         parents_meta = _get_parents_meta(fm)
         parents_auto = False
         if not parents_meta and auto_parents and content:
-            # 1. Hierarchy link: closest entity by embedding similarity
             if RULE["reference_vectors"]:
                 vec = await _get_embedding(_strip_formula_html(content)[:EMBED_MAX_CHARS])
                 if vec:
@@ -2276,12 +2287,18 @@ async def _process_orphans(
                             (level,)
                         ) as cur:
                             rows = await cur.fetchall()
-                    
+
                     core_result = await _determine_core_by_embedding(content, db_path)
-                    dominant_core = core_result.get("dominant")
-                    
+
+                    if reason != "no_sign" and sign_result.get("actual_sign"):
+                        man_cores = [ch for ch in sign_result["actual_sign"] if ch in CORE_SIGNS]
+                        dominant_core = man_cores[0] if man_cores else core_result.get("dominant")
+                    else:
+                        dominant_core = core_result.get("dominant")
+
                     best = None
                     best_score = 0.0
+                    best_same_core = False
                     for p_path, p_sign, p_level, emb_json in rows:
                         try:
                             other_vec = json.loads(emb_json)
@@ -2290,12 +2307,12 @@ async def _process_orphans(
                         sim = _cosine(vec, other_vec)
                         p_cores = [ch for ch in (p_sign or "") if ch in CORE_SIGNS]
                         same_core = dominant_core and dominant_core in p_cores if p_cores else False
-                        adjusted = sim + (0.1 if same_core else 0.0)
-                        if adjusted > best_score:
-                            best_score = adjusted
+                        if sim > best_score or (sim == best_score and same_core and not best_same_core):
+                            best_score = sim
+                            best_same_core = same_core
                             best = Path(p_path).stem
-                    
-                    if best and best_score >= 0.45:
+
+                    if best and best_score >= PARENT_LINK_THRESHOLD:
                         parents_meta = [{"entity": best, "link_type": "hierarchy"}]
                         parents_auto = True
             
@@ -2848,6 +2865,7 @@ async def run_server():
 
                             best = None
                             best_score = 0.0
+                            best_same_core = False
                             for p_path, p_sign, p_level, emb_json in rows:
                                 try:
                                     other_vec = json.loads(emb_json)
@@ -2856,12 +2874,12 @@ async def run_server():
                                 sim = _cosine(vec, other_vec)
                                 p_cores = [ch for ch in (p_sign or "") if ch in CORE_SIGNS]
                                 same_core = dominant_core and dominant_core in p_cores if p_cores else False
-                                adjusted = sim + (0.1 if same_core else 0.0)
-                                if adjusted > best_score:
-                                    best_score = adjusted
+                                if sim > best_score or (sim == best_score and same_core and not best_same_core):
+                                    best_score = sim
+                                    best_same_core = same_core
                                     best = Path(p_path).stem
 
-                            if best and best_score >= 0.45:
+                            if best and best_score >= PARENT_LINK_THRESHOLD:
                                 parents_meta.append({"entity": best, "link_type": "hierarchy"})
 
                     # 2. Temporary link: domain anchor (L1/L2 with matching core)
