@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nouz -- Unified MCP Server for Obsidian. v2.5.1
+Nouz -- Unified MCP Server for Obsidian. v2.5.2
 
 Three modes:
 - luca: Graph-based, level is for display only, no semantic classification
@@ -9,7 +9,7 @@ Three modes:
 - sloi: Strict 5-level hierarchy with semantic classification
 """
 
-VERSION = "2.5.1"
+VERSION = "2.5.2"
 
 import asyncio
 import hashlib
@@ -36,13 +36,24 @@ from mcp import types
 # Mode Configuration
 # ============================================================================
 
+DEFAULT_ARTIFACT_SIGNS = [
+    {"sign": "β", "name": "Note", "text": "Short note, observation, fragment."},
+    {"sign": "δ", "name": "Concept", "text": "Definition, concept, entity description."},
+    {"sign": "ζ", "name": "Reference", "text": "External source, documentation, link, citation."},
+    {"sign": "σ", "name": "Log", "text": "Session log, chronology, dialogue record."},
+    {"sign": "μ", "name": "News", "text": "News item, update, release note."},
+    {"sign": "λ", "name": "Hypothesis", "text": "Hypothesis, assumption, speculative idea."},
+    {"sign": "🝕", "name": "Specification", "text": "Technical specification, instruction, requirements."},
+]
+
 DEFAULT_CONFIG = {
-    "mode": "prizma",
+    "mode": "luca",
     "etalons": [],
+    "artifact_signs": DEFAULT_ARTIFACT_SIGNS,
     "meta_root": "",
     "profiles": {
         "default": {
-            "mode": "prizma",
+            "mode": "luca",
             "etalons": []
         }
     },
@@ -97,57 +108,70 @@ RULES = {
     }
 }
 
+def _apply_profile(config: Dict[str, Any], profile_name: str, source: Path) -> Dict[str, Any]:
+    profiles = config.get("profiles", {})
+    if profiles and profile_name in profiles:
+        profile = profiles[profile_name]
+        merged = dict(config)
+        merged["mode"] = profile.get("mode", config.get("mode", "luca"))
+        merged["etalons"] = profile.get("etalons", config.get("etalons", []))
+        logging.info(f"Loaded config from {source}, profile: {profile_name}")
+        return merged
+    logging.info(f"Loaded config from {source}")
+    return config
+
 def load_config() -> Dict[str, Any]:
-    config_path = Path(__file__).parent / "config.yaml"
-    local_config_path = Path(__file__).parent / "config_local.yaml"
+    base_dir = Path(__file__).parent
     profile_name = os.getenv("PROFILE", "default")
-    
-    # Try local config first (for personal profiles)
-    if local_config_path.exists():
+
+    candidates: List[Path] = []
+    if os.getenv("NOUZ_CONFIG"):
+        candidates.append(Path(os.environ["NOUZ_CONFIG"]))
+    candidates.extend([
+        Path.cwd() / "config_local.yaml",
+        base_dir / "config_local.yaml",
+        Path.cwd() / "config.yaml",
+        base_dir / "config.yaml",
+    ])
+
+    seen: Set[Path] = set()
+    for candidate in candidates:
         try:
-            with open(local_config_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-            
-            # Check for profile match
-            profiles = config.get("profiles", {})
-            if profiles and profile_name in profiles:
-                profile = profiles[profile_name]
-                config["mode"] = profile.get("mode", config.get("mode", "prizma"))
-                config["etalons"] = profile.get("etalons", config.get("etalons", []))
-                logging.info(f"Loaded local config, profile: {profile_name}")
-                return config
-            
-            # No profile match - use top-level etalons if present
-            if config.get("etalons"):
-                logging.info(f"Loaded local config (no profile match), using top-level etalons")
-                return config
-        except Exception as e:
-            logging.warning(f"Failed to load local config: {e}")
-    
-    # Fall back to default config.yaml
-    if config_path.exists():
+            resolved = candidate.resolve()
+        except Exception:
+            resolved = candidate
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if not candidate.exists():
+            continue
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-            logging.info(f"Loaded config from {config_path}")
-            return config
+            with open(candidate, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            return _apply_profile(config, profile_name, candidate)
         except Exception as e:
-            logging.warning(f"Failed to load config: {e}, using defaults")
+            logging.warning(f"Failed to load config from {candidate}: {e}")
+
+    logging.info("No config.yaml found; using LUCA defaults. Copy config.template.yaml to config.yaml to enable PRIZMA/SLOI.")
     return DEFAULT_CONFIG
 
 CONFIG = load_config()
-MODE = CONFIG.get("mode", "prizma")
-RULE = RULES.get(MODE, RULES["prizma"])
+MODE = CONFIG.get("mode", "luca")
+RULE = RULES.get(MODE, RULES["luca"])
 
 CORE_ETALON_TEXTS = {e["sign"]: e["text"] for e in CONFIG.get("etalons", DEFAULT_CONFIG["etalons"])}
 CORE_SIGNS = set(CORE_ETALON_TEXTS.keys())
 CONFIG_SIGN_CHARS = set(CONFIG.get("sign_chars", ""))
 
-# Artifact etalons: used for reference/descriptions, NOT for embedding classification.
-# Artifact signs are determined by heuristics (_determine_artifact_sign).
-ARTIFACT_ETALON_LIST = CONFIG.get("artifact_etalons", [])
-ARTIFACT_SIGNS = set(e["sign"] for e in ARTIFACT_ETALON_LIST)
-ARTIFACT_ETALON_TEXTS = {e["sign"]: e["text"] for e in ARTIFACT_ETALON_LIST}
+# Artifact signs are labels for heuristic classification, not embedding etalons.
+# "artifact_etalons" is accepted as a legacy config key for older local configs.
+ARTIFACT_SIGN_LIST = (
+    CONFIG.get("artifact_signs")
+    or CONFIG.get("artifact_etalons")
+    or DEFAULT_CONFIG["artifact_signs"]
+)
+ARTIFACT_SIGNS = set(e["sign"] for e in ARTIFACT_SIGN_LIST)
+ARTIFACT_SIGN_TEXTS = {e["sign"]: e.get("text", "") for e in ARTIFACT_SIGN_LIST}
 LEVEL_MAP = CONFIG.get("levels", DEFAULT_CONFIG["levels"])
 SIGN_SPREAD_THRESHOLD = CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("sign_spread", 0.05)
 CONFIDENT_SPREAD_THRESHOLD = CONFIG.get("thresholds", DEFAULT_CONFIG["thresholds"]).get("confident_spread", 60.0)
@@ -599,7 +623,7 @@ def _determine_artifact_sign(content: str, meta: Dict) -> str:
     """Determine artifact sign by content structure/heuristics — no embeddings needed.
     
     Artifact signs describe FORMAT/STRUCTURE, not topic. This is intentional:
-    a log about physics should be σ (log), not Δ (data) — the embedding captures
+    a log about physics should be σ (log), not D (domain) — the embedding captures
     the physics topic for semantic bridges, while the sign captures the format.
     
     Priority order: most specific/structured first, least specific (β) as fallback.
@@ -684,7 +708,7 @@ async def _collect_artifact_sign_from_children(meta: Dict, db_path: str) -> str:
                     end = raw.find("\n---\n", 4)
                     if end > 0:
                         fm = yaml.safe_load(raw[4:end]) or {}
-                        art_sign = fm.get("sign", "")
+                        art_sign = fm.get("artifact_sign") or fm.get("sign", "")
                         for ch in _extract_artifact_sign_from_sign(art_sign):
                             artifact_signs.add(ch)
             except Exception:
@@ -1132,7 +1156,7 @@ def _structural_similarity(profile_a: Dict, profile_b: Dict) -> float:
 
     # 1. Core mix cosine: similar angle to dominating core
     # Two notes from different cores but with similar core_mix proportions
-    # have analogous structural roles (e.g., Δ70%/Ψ30% mirrors Σ70%/Ψ30%)
+    # have analogous structural roles (e.g., S70%/D30% mirrors E70%/D30%)
     if profile_a.get("core_mix") and profile_b.get("core_mix"):
         keys = sorted(set(profile_a["core_mix"].keys()) | set(profile_b["core_mix"].keys()))
         vec_a = [profile_a["core_mix"].get(k, 0.0) for k in keys]
@@ -2547,7 +2571,7 @@ async def run_server():
                 types.Tool(
                     name="suggest_parents",
                     description="Find semantically similar notes by vector cosine similarity and suggest them as potential parent links. "
-                            "Returns top_n candidates ranked by similarity score, with same-core matches prioritized. "
+                            "Returns top_n candidates ranked by similarity score, with matching-domain candidates prioritized only for ties. "
                             "Read-only — does not modify any files. Requires embeddings (prizma/sloi modes). "
                             "Use this to discover hierarchy links for orphan notes; "
                             "use suggest_metadata for broader classification (sign, level, bridges); "
@@ -2575,8 +2599,8 @@ async def run_server():
                 ),
                 types.Tool(
                     name="recalc_core_mix",
-                    description="Recalculate core_mix bottom-up: quants (L4) -> modules (L3) -> patterns (L2). "
-                            "Each parent node gets a weighted average of its children's sign distributions. "
+                    description="Recalculate core_mix bottom-up: L4 keeps the domain profile computed from text classification; "
+                            "L3 and L2 aggregate their child nodes' sign distributions. "
                             "Writes updated core_mix to the DB only — does not modify YAML files. "
                             "Run after index_all with embeddings or after recalc_signs. Not available in luca mode.",
                     inputSchema={"type": "object", "properties": {}}

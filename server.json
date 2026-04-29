@@ -7,12 +7,12 @@
     "url": "https://github.com/KVANTRA-dev/NOUZ-MCP",
     "source": "github"
   },
-  "version": "2.5.1",
+  "version": "2.5.2",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "nouz-mcp",
-  "version": "2.5.1",
+      "version": "2.5.2",
       "transport": {
         "type": "stdio"
       },
@@ -25,11 +25,10 @@
           "default": "./obsidian"
         },
         {
-          "name": "MODE",
-          "description": "Server mode: luca, prizma, or sloi",
+          "name": "NOUZ_CONFIG",
+          "description": "Absolute path to config.yaml; if omitted, server looks in current working directory",
           "format": "string",
-          "isRequired": false,
-          "default": "prizma"
+          "isRequired": false
         },
         {
           "name": "EMBED_ENABLED",
@@ -40,7 +39,7 @@
         },
         {
           "name": "EMBED_PROVIDER",
-          "description": "Embedding provider: openai, gigachat, lmstudio",
+          "description": "Embedding provider: openai, gigachat, lmstudio, ollama",
           "format": "string",
           "isRequired": false,
           "default": "openai"

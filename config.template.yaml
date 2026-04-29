@@ -1,7 +1,9 @@
 # =============================================================================
 # NOUZ MCP Server Configuration Template
 # =============================================================================
-# Rename this file to config.yaml to activate custom settings.
+# Copy this file to config.yaml to activate custom settings.
+# macOS/Linux: cp config.template.yaml config.yaml
+# Windows PowerShell: Copy-Item config.template.yaml config.yaml
 # By default, without config.yaml, the server runs in "luca" mode (pure graph).
 
 # Mode: luca | prizma | sloi
@@ -23,7 +25,7 @@ meta_root: ""
 # and explicit boundary statements ("not X and not Y").
 etalons:
   - sign: S
-    name: Systems Thinking
+    name: Systems Analysis
     text: >
       Methodology for analysing complex objects: feedback loops,
       emergent properties, self-regulation, bifurcation points.
@@ -87,25 +89,45 @@ thresholds:
 
   # Minimum cosine similarity to auto-link a file to a parent.
   # Used by process_orphans and add_entity when auto_parents=true.
-  # Raw cosine (no same-core bonus) — ensures meaningful semantic proximity.
-  # Same-core is used as tiebreaker when scores are equal, not as a score booster.
+  # Raw cosine only — ensures meaningful semantic proximity.
+  # Matching domain is used only as a tiebreaker, not as a score booster.
   parent_link_threshold: 0.55
 
-# Extra sign characters for parsing entity names (beyond etalon signs).
-# Used to extract signs from filenames like "S Thermodynamics" or "SE System".
-# Add any custom symbols you use in your vault — this is ONLY for name parsing,
-# NOT for classification. Core signs are always derived from etalons above.
-# Examples: "αβγδεζηθλμσφψω" for Greek letters, or "" if you use only ASCII signs.
-sign_chars: ""
+  # Confidence threshold for spread-normalized sign classification.
+  # If the dominant core's adjusted percentage >= confident_spread,
+  # sign_source = "auto"; otherwise sign_source = "weak_auto".
+  confident_spread: 60.0
 
-# Confidence threshold for spread-normalized sign classification.
-# After mean-centering and spread normalization, if the dominant core's
-# adjusted percentage >= confident_spread → sign_source = "auto" (reliable).
-# If below → sign_source = "weak_auto" (relative best-guess, bridges not blocked).
-# Default 60.0 means the dominant core must account for ≥60% of the spread.
-# Lower values (40-50) produce more "auto" classifications but less reliable ones.
-# Higher values (70-80) are stricter — fewer auto signs, more weak_auto.
-confident_spread: 60.0
+# Artifact signs are heuristic labels, not embedding etalons.
+# L5 artifacts get one of these signs by content-structure rules.
+# L4 quants can include artifact_sign as the horizontal part of a composite sign.
+artifact_signs:
+  - sign: β
+    name: Note
+    text: "Short note, observation, fragment."
+  - sign: δ
+    name: Concept
+    text: "Definition, concept, entity description."
+  - sign: ζ
+    name: Reference
+    text: "External source, documentation, link, citation."
+  - sign: σ
+    name: Log
+    text: "Session log, chronology, dialogue record."
+  - sign: μ
+    name: News
+    text: "News item, update, release note."
+  - sign: λ
+    name: Hypothesis
+    text: "Hypothesis, assumption, speculative idea."
+  - sign: 🝕
+    name: Specification
+    text: "Technical specification, instruction, requirements."
+
+# Extra sign characters for parsing entity names (beyond etalon and artifact signs).
+# Used to extract signs from filenames like "S Thermodynamics" or "SE System".
+# This is ONLY for name parsing, NOT for classification.
+sign_chars: ""
 
 # Lenses moved to separate PRIZMA server (LINZA).
 # See: https://github.com/KVANTRA-dev/LINZA

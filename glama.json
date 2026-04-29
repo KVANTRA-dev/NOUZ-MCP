@@ -2,15 +2,19 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["KVANTRA-dev"],
   "name": "NOUZ MCP Server",
-  "description": "Semantic knowledge engine for Obsidian — vector embeddings, DAG hierarchy, auto-classification, and cross-domain bridge detection",
+  "description": "Local-first semantic memory server for Markdown/Obsidian via MCP — vector embeddings, DAG hierarchy, auto-classification, and cross-domain bridge detection",
   "tools": 15,
   "keywords": [
     "obsidian",
+    "markdown",
     "knowledge-graph",
+    "semantic-memory",
     "semantic-search",
-    "dag",
     "embeddings",
+    "dag",
+    "mcp",
     "mcp-server",
+    "local-first",
     "auto-classification",
     "domain-signs"
   ]
